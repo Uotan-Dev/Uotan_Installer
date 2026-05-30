@@ -1,0 +1,275 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:UotanInstaller.App.ViewModels"
+        xmlns:models="using:UotanInstaller.App.Models"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="400"
+        x:Class="UotanInstaller.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="avares://UotanInstaller.App/Assets/uotan.ico"
+        Title="柚坛工具箱部署器"
+        Width="700" Height="400"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        Background="{DynamicResource SurfaceBrush}">
+
+  <Design.DataContext>
+    <vm:MainWindowViewModel/>
+  </Design.DataContext>
+
+    <Grid ColumnDefinitions="180,*"
+          RowDefinitions="*,Auto"
+          Margin="0">
+
+      <!-- Left Panel: Logo + Version -->
+      <StackPanel Grid.Column="0"
+                  Grid.Row="0"
+                  VerticalAlignment="Center"
+                  HorizontalAlignment="Center"
+                  Margin="16,16,16,16">
+
+        <Image Source="avares://UotanInstaller.App/Assets/uotan.png"
+               Width="120" Height="120"
+               Stretch="Uniform"
+               Margin="0,0,0,16" />
+
+        <TextBlock Text="UotanToolbox"
+                   FontSize="16"
+                   FontWeight="SemiBold"
+                   HorizontalAlignment="Center"
+                   Foreground="{DynamicResource TextPrimaryBrush}" />
+
+        <TextBlock Text="{Binding VersionText}"
+                   Classes="version"
+                   HorizontalAlignment="Center" />
+      </StackPanel>
+
+      <!-- Right Panel: Step Content -->
+      <Grid Grid.Column="1" Grid.Row="0"
+            Margin="0,16,24,16">
+
+        <!-- Step 1: Eula -->
+        <StackPanel IsVisible="{Binding IsEulaStep}"
+                    VerticalAlignment="Center">
+          <TextBlock Text="用户协议"
+                     Classes="step-title" />
+          <TextBlock Text="请阅读并同意最终用户许可协议后继续安装。"
+                     Classes="step-desc" />
+
+          <CheckBox Classes="check"
+                    IsChecked="{Binding IsCreateShortcut}"
+                    Content="创建桌面快捷方式"
+                    Margin="0,8,0,4" />
+
+          <TextBlock Text="安装路径"
+                     Classes="form-label"
+                     Margin="0,12,0,4" />
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBox Grid.Column="0"
+                     Classes="input"
+                     Text="{Binding InstallPath}"
+                     IsReadOnly="False"
+                     FontSize="12" />
+            <Button Grid.Column="1"
+                    Classes="secondary"
+                    Content="浏览"
+                    Command="{Binding BrowseInstallPathCommand}"
+                    Margin="8,0,0,0"
+                    Padding="12,8" />
+          </Grid>
+
+          <CheckBox Classes="check"
+                    IsChecked="{Binding IsAgreeEula}"
+                    Content="我已阅读并同意最终用户许可协议"
+                    Margin="0,4,0,8" />
+
+          <StackPanel Classes="button-row">
+            <Button Classes="accent"
+                    Content="开始"
+                    Command="{Binding StartCommand}" />
+          </StackPanel>
+        </StackPanel>
+
+        <!-- Step 2: ChooseMirror -->
+        <Grid IsVisible="{Binding IsChooseMirrorStep}"
+              RowDefinitions="Auto,Auto,*,Auto">
+
+          <StackPanel Grid.Row="0">
+            <TextBlock Classes="step-title">
+              <TextBlock.Text>
+                <MultiBinding StringFormat="{}选择镜像源 - v{0}">
+                  <Binding Path="PatchVersion" />
+                </MultiBinding>
+              </TextBlock.Text>
+            </TextBlock>
+            <TextBlock Text="请选择一个下载镜像源，推荐选择速度最快的镜像。"
+                       Classes="step-desc" />
+          </StackPanel>
+
+          <ProgressBar Grid.Row="1"
+                       Classes="install"
+                       IsIndeterminate="True"
+                       IsVisible="{Binding IsLoadingMirrors}"
+                       Margin="0,0,0,8" />
+
+          <ListBox Grid.Row="2"
+                   ItemsSource="{Binding Mirrors}"
+                   SelectedItem="{Binding SelectedMirror}"
+                   Margin="0,0,0,8">
+            <ListBox.Styles>
+              <Style Selector="ListBoxItem">
+                <Setter Property="Padding" Value="12,10" />
+                <Setter Property="Margin" Value="0,2" />
+                <Setter Property="CornerRadius" Value="6" />
+              </Style>
+            </ListBox.Styles>
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="models:GenericPatchPackageMirror">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0"
+                             Text="{Binding DisplayUrl}"
+                             FontSize="13"
+                             VerticalAlignment="Center"
+                             TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="1"
+                             VerticalAlignment="Center"
+                             FontSize="13">
+                    <TextBlock.Text>
+                      <MultiBinding StringFormat="{}{0:F1} MB/s">
+                        <Binding Path="Speed" />
+                      </MultiBinding>
+                    </TextBlock.Text>
+                  </TextBlock>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+
+          <StackPanel Grid.Row="3" Classes="button-row">
+            <Button Classes="secondary"
+                    Content="测速"
+                    Command="{Binding SpeedTestCommand}"
+                    IsVisible="{Binding !IsSpeedTesting}" />
+            <ProgressBar Classes="install"
+                         IsIndeterminate="True"
+                         Width="80"
+                         IsVisible="{Binding IsSpeedTesting}" />
+            <Button Classes="accent"
+                    Content="{Binding InstallButtonText}"
+                    Command="{Binding InstallCommand}" />
+          </StackPanel>
+        </Grid>
+
+        <!-- Step 3: Installing -->
+        <StackPanel IsVisible="{Binding IsInstallingStep}"
+                    VerticalAlignment="Center">
+          <TextBlock Text="正在安装"
+                     Classes="step-title" />
+
+          <ItemsControl ItemsSource="{Binding InstallSubSteps}"
+                        Margin="0,0,0,16">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:InstallSubStepItem">
+                <Grid ColumnDefinitions="24,*"
+                      Margin="0,4">
+                  <Border Width="18" Height="18"
+                          CornerRadius="9"
+                          Margin="0,0,6,0"
+                          Background="{DynamicResource SurfaceVariantBrush}" />
+                  <TextBlock Grid.Column="1"
+                             Text="{Binding DisplayName}"
+                             VerticalAlignment="Center"
+                             FontSize="14"
+                             Foreground="{DynamicResource TextSecondaryBrush}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <ProgressBar Classes="install"
+                       Value="{Binding InstallProgressValue}"
+                       Maximum="1"
+                       Margin="0,0,0,8" />
+
+          <TextBlock Text="{Binding InstallStatusText}"
+                     FontSize="13"
+                     Foreground="{DynamicResource TextSecondaryBrush}"
+                     TextWrapping="Wrap" />
+        </StackPanel>
+
+        <!-- Step 4: Finish -->
+        <StackPanel IsVisible="{Binding IsFinishStep}"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center">
+          <Border Width="64" Height="64"
+                  CornerRadius="32"
+                  Background="{DynamicResource SuccessBrush}"
+                  Margin="0,0,0,16">
+            <TextBlock Text="&#xE73E;"
+                       FontFamily="Segoe MDL2 Assets"
+                       FontSize="28"
+                       Foreground="White"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center" />
+          </Border>
+
+          <TextBlock Text="安装完成"
+                     Classes="step-title"
+                     HorizontalAlignment="Center" />
+
+          <TextBlock Text="UotanToolbox 已成功安装到您的设备上。"
+                     Classes="step-desc"
+                     HorizontalAlignment="Center" />
+
+          <StackPanel Classes="button-row"
+                      HorizontalAlignment="Center">
+            <Button Classes="accent"
+                    Content="启动柚坛工具箱"
+                    Command="{Binding LaunchAppCommand}" />
+          </StackPanel>
+        </StackPanel>
+
+        <!-- Step 5: AlreadyInstalled -->
+        <StackPanel IsVisible="{Binding IsAlreadyInstalledStep}"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center">
+          <Border Width="64" Height="64"
+                  CornerRadius="32"
+                  Background="{DynamicResource BrandBrush}"
+                  Margin="0,0,0,16">
+            <TextBlock Text="&#xE916;"
+                       FontFamily="Segoe MDL2 Assets"
+                       FontSize="28"
+                       Foreground="White"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center" />
+          </Border>
+
+          <TextBlock Classes="step-title"
+                     HorizontalAlignment="Center">
+            <TextBlock.Text>
+              <MultiBinding StringFormat="{}已安装 - v{0}">
+                <Binding Path="InstalledVersion" />
+              </MultiBinding>
+            </TextBlock.Text>
+          </TextBlock>
+
+          <TextBlock Text="UotanToolbox 已安装在您的设备上。"
+                     Classes="step-desc"
+                     HorizontalAlignment="Center" />
+
+          <StackPanel Classes="button-row"
+                      HorizontalAlignment="Center">
+            <Button Classes="secondary"
+                    Content="重新安装"
+                    Command="{Binding ReinstallCommand}" />
+            <Button Classes="accent"
+                    Content="启动柚坛工具箱"
+                    Command="{Binding LaunchAppCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Grid>
+
+    </Grid>
+</Window>

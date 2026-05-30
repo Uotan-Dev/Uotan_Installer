@@ -1,0 +1,36 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:s="clr-namespace:System;assembly=System.Runtime">
+  <s:String x:Key="AppTitle">UotanToolbox インストーラー</s:String>
+  <s:String x:Key="EulaTitle">エンドユーザーライセンス契約</s:String>
+  <s:String x:Key="EulaDesc">エンドユーザーライセンス契約に同意してください。</s:String>
+  <s:String x:Key="CreateShortcut">デスクトップショートカットを作成</s:String>
+  <s:String x:Key="AgreeEula">エンドユーザーライセンス契約に同意します</s:String>
+  <s:String x:Key="InstallPath">インストールパス</s:String>
+  <s:String x:Key="Browse">参照</s:String>
+  <s:String x:Key="Start">開始</s:String>
+  <s:String x:Key="ChooseMirrorTitle">ミラーを選択</s:String>
+  <s:String x:Key="ChooseMirrorDesc">ダウンロードミラーを選択してください。最速のミラーを推奨します。</s:String>
+  <s:String x:Key="SpeedTest">速度テスト</s:String>
+  <s:String x:Key="Install">インストール</s:String>
+  <s:String x:Key="Installing">インストール中</s:String>
+  <s:String x:Key="Downloading">パッケージをダウンロード中...</s:String>
+  <s:String x:Key="Verifying">ファイルの整合性を確認中...</s:String>
+  <s:String x:Key="Extracting">ファイルを展開中...</s:String>
+  <s:String x:Key="InstallComplete">インストール完了</s:String>
+  <s:String x:Key="InstallCompleteDesc">UotanToolbox が正常にインストールされました。</s:String>
+  <s:String x:Key="LaunchApp">UotanToolbox を起動</s:String>
+  <s:String x:Key="AlreadyInstalled">既にインストール済み</s:String>
+  <s:String x:Key="AlreadyInstalledDesc">UotanToolbox は既にインストールされています。</s:String>
+  <s:String x:Key="Reinstall">再インストール</s:String>
+  <s:String x:Key="ConfirmExit">インストールを終了しますか？</s:String>
+  <s:String x:Key="ConfirmExitInstalling">インストールが完了していません。終了しますか？</s:String>
+  <s:String x:Key="Yes">はい</s:String>
+  <s:String x:Key="No">いいえ</s:String>
+  <s:String x:Key="Ok">OK</s:String>
+  <s:String x:Key="Cancel">キャンセル</s:String>
+  <s:String x:Key="LoadMirrorFailed">ミラーリストの読み込みに失敗しました</s:String>
+  <s:String x:Key="SpeedTesting">速度を測定中...</s:String>
+  <s:String x:Key="MirrorSpeedUnit">MB/s</s:String>
+  <s:String x:Key="Unreachable">到達不可</s:String>
+</ResourceDictionary>

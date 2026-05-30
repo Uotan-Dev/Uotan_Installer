@@ -1,0 +1,282 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Styles.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Dark">
+          <Color x:Key="BrandColor">#FF6B35</Color>
+          <Color x:Key="BrandColorLight">#FF8C5A</Color>
+          <Color x:Key="BrandColorDark">#CC5529</Color>
+          <Color x:Key="SurfaceColor">#1E1E1E</Color>
+          <Color x:Key="SurfaceColorVariant">#2D2D2D</Color>
+          <Color x:Key="BackgroundColor">#0A0A0A</Color>
+          <Color x:Key="CardColor">#1C1C1C</Color>
+          <Color x:Key="TextColorPrimary">#FFFFFF</Color>
+          <Color x:Key="TextColorSecondary">#B0B0B0</Color>
+          <Color x:Key="TextColorDisabled">#5C5C5C</Color>
+          <Color x:Key="BorderColor">#3D3D3D</Color>
+          <Color x:Key="ErrorColor">#FF4444</Color>
+          <Color x:Key="SuccessColor">#4CAF50</Color>
+          <Color x:Key="WarningColor">#FF9800</Color>
+          <SolidColorBrush x:Key="BrandBrush" Color="{StaticResource BrandColor}" />
+          <SolidColorBrush x:Key="BrandBrushLight" Color="{StaticResource BrandColorLight}" />
+          <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}" />
+          <SolidColorBrush x:Key="SurfaceVariantBrush" Color="{StaticResource SurfaceColorVariant}" />
+          <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}" />
+          <SolidColorBrush x:Key="CardBrush" Color="{StaticResource CardColor}" />
+          <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextColorPrimary}" />
+          <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextColorSecondary}" />
+          <SolidColorBrush x:Key="TextDisabledBrush" Color="{StaticResource TextColorDisabled}" />
+          <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}" />
+          <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ErrorColor}" />
+          <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
+          <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Light">
+          <Color x:Key="BrandColor">#E85D26</Color>
+          <Color x:Key="BrandColorLight">#FF7A45</Color>
+          <Color x:Key="BrandColorDark">#C44D1E</Color>
+          <Color x:Key="SurfaceColor">#F3F3F3</Color>
+          <Color x:Key="SurfaceColorVariant">#E8E8E8</Color>
+          <Color x:Key="BackgroundColor">#FAFAFA</Color>
+          <Color x:Key="CardColor">#FFFFFF</Color>
+          <Color x:Key="TextColorPrimary">#1A1A1A</Color>
+          <Color x:Key="TextColorSecondary">#616161</Color>
+          <Color x:Key="TextColorDisabled">#BDBDBD</Color>
+          <Color x:Key="BorderColor">#E0E0E0</Color>
+          <Color x:Key="ErrorColor">#D32F2F</Color>
+          <Color x:Key="SuccessColor">#388E3C</Color>
+          <Color x:Key="WarningColor">#F57C00</Color>
+          <SolidColorBrush x:Key="BrandBrush" Color="{StaticResource BrandColor}" />
+          <SolidColorBrush x:Key="BrandBrushLight" Color="{StaticResource BrandColorLight}" />
+          <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}" />
+          <SolidColorBrush x:Key="SurfaceVariantBrush" Color="{StaticResource SurfaceColorVariant}" />
+          <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}" />
+          <SolidColorBrush x:Key="CardBrush" Color="{StaticResource CardColor}" />
+          <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextColorPrimary}" />
+          <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextColorSecondary}" />
+          <SolidColorBrush x:Key="TextDisabledBrush" Color="{StaticResource TextColorDisabled}" />
+          <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}" />
+          <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ErrorColor}" />
+          <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
+          <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Styles.Resources>
+
+  <!-- Primary Button -->
+  <Style Selector="Button.accent">
+    <Setter Property="Background" Value="{DynamicResource BrandBrush}" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="24,10" />
+    <Setter Property="MinWidth" Value="120" />
+    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.accent:pointerover">
+    <Setter Property="Background" Value="{DynamicResource BrandBrushLight}" />
+  </Style>
+  <Style Selector="Button.accent:pressed">
+    <Setter Property="Background" Value="{DynamicResource BrandBrush}" />
+    <Setter Property="Opacity" Value="0.85" />
+  </Style>
+  <Style Selector="Button.accent:disabled">
+    <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}" />
+    <Setter Property="Opacity" Value="0.5" />
+  </Style>
+
+  <!-- Secondary Button -->
+  <Style Selector="Button.secondary">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="FontWeight" Value="Normal" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="20,10" />
+    <Setter Property="MinWidth" Value="100" />
+    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.secondary:pointerover">
+    <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}" />
+  </Style>
+  <Style Selector="Button.secondary:pressed">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+  </Style>
+
+  <!-- Link Button -->
+  <Style Selector="Button.link">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource BrandBrush}" />
+    <Setter Property="FontWeight" Value="Normal" />
+    <Setter Property="Padding" Value="4,2" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+  </Style>
+  <Style Selector="Button.link:pointerover">
+    <Setter Property="Opacity" Value="0.8" />
+  </Style>
+
+  <!-- Danger Button -->
+  <Style Selector="Button.danger">
+    <Setter Property="Background" Value="{DynamicResource ErrorBrush}" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="24,10" />
+    <Setter Property="MinWidth" Value="120" />
+    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.danger:pointerover">
+    <Setter Property="Opacity" Value="0.85" />
+  </Style>
+
+  <!-- Input TextBox -->
+  <Style Selector="TextBox.input">
+    <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="12,8" />
+    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="FontSize" Value="14" />
+  </Style>
+  <Style Selector="TextBox.input:focus">
+    <Setter Property="BorderBrush" Value="{DynamicResource BrandBrush}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+  <Style Selector="TextBox.input:disabled">
+    <Setter Property="Opacity" Value="0.5" />
+  </Style>
+
+  <!-- CheckBox -->
+  <Style Selector="CheckBox.check">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Margin" Value="0,6" />
+  </Style>
+
+  <!-- ProgressBar -->
+  <Style Selector="ProgressBar.install">
+    <Setter Property="MinHeight" Value="6" />
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="Foreground" Value="{DynamicResource BrandBrush}" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}" />
+  </Style>
+
+  <!-- ListBoxItem for Mirror List -->
+  <Style Selector="ListBoxItem.mirror">
+    <Setter Property="Padding" Value="12,10" />
+    <Setter Property="Margin" Value="0,2" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="ListBoxItem.mirror:pointerover">
+    <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}" />
+  </Style>
+  <Style Selector="ListBoxItem.mirror:selected">
+    <Setter Property="Background" Value="{DynamicResource BrandBrush}" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BrandBrush}" />
+  </Style>
+  <Style Selector="ListBoxItem.mirror:selected:pointerover">
+    <Setter Property="Background" Value="{DynamicResource BrandBrushLight}" />
+  </Style>
+
+  <!-- Spinner Rotation -->
+  <Style Selector="Border.spinner">
+    <Setter Property="Width" Value="24" />
+    <Setter Property="Height" Value="24" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BrandBrush}" />
+    <Setter Property="BorderThickness" Value="3" />
+    <Setter Property="ClipToBounds" Value="True" />
+    <Setter Property="RenderTransform" Value="rotate(0)" />
+    <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+  </Style>
+
+  <!-- SubStep Item -->
+  <Style Selector="Border.substep">
+    <Setter Property="Padding" Value="8,6" />
+    <Setter Property="Margin" Value="0,4" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}" />
+  </Style>
+  <Style Selector="Border.substep-active">
+    <Setter Property="Padding" Value="8,6" />
+    <Setter Property="Margin" Value="0,4" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Background" Value="{DynamicResource BrandBrush}" />
+  </Style>
+  <Style Selector="Border.substep-completed">
+    <Setter Property="Padding" Value="8,6" />
+    <Setter Property="Margin" Value="0,4" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Background" Value="{DynamicResource SuccessBrush}" />
+  </Style>
+  <Style Selector="Border.substep-failed">
+    <Setter Property="Padding" Value="8,6" />
+    <Setter Property="Margin" Value="0,4" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Background" Value="{DynamicResource ErrorBrush}" />
+  </Style>
+
+  <!-- Step Title -->
+  <Style Selector="TextBlock.step-title">
+    <Setter Property="FontSize" Value="22" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="Margin" Value="0,0,0,16" />
+  </Style>
+
+  <!-- Step Description -->
+  <Style Selector="TextBlock.step-desc">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="Margin" Value="0,0,0,12" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <!-- Version Text -->
+  <Style Selector="TextBlock.version">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}" />
+    <Setter Property="Margin" Value="0,8,0,0" />
+  </Style>
+
+  <!-- Card Panel -->
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="20" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+  <!-- Form Label -->
+  <Style Selector="TextBlock.form-label">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="Margin" Value="0,0,0,4" />
+  </Style>
+
+  <!-- Button Row -->
+  <Style Selector="StackPanel.button-row">
+    <Setter Property="Orientation" Value="Horizontal" />
+    <Setter Property="Spacing" Value="12" />
+    <Setter Property="HorizontalAlignment" Value="Right" />
+    <Setter Property="Margin" Value="0,16,0,0" />
+  </Style>
+
+</Styles>

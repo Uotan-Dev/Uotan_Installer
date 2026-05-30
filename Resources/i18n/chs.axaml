@@ -1,0 +1,36 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:s="clr-namespace:System;assembly=System.Runtime">
+  <s:String x:Key="AppTitle">柚坛工具箱部署器</s:String>
+  <s:String x:Key="EulaTitle">用户协议</s:String>
+  <s:String x:Key="EulaDesc">请阅读并同意最终用户许可协议后继续安装。</s:String>
+  <s:String x:Key="CreateShortcut">创建桌面快捷方式</s:String>
+  <s:String x:Key="AgreeEula">我已阅读并同意最终用户许可协议</s:String>
+  <s:String x:Key="InstallPath">安装路径</s:String>
+  <s:String x:Key="Browse">浏览</s:String>
+  <s:String x:Key="Start">开始</s:String>
+  <s:String x:Key="ChooseMirrorTitle">选择镜像源</s:String>
+  <s:String x:Key="ChooseMirrorDesc">请选择一个下载镜像源，推荐选择速度最快的镜像。</s:String>
+  <s:String x:Key="SpeedTest">测速</s:String>
+  <s:String x:Key="Install">安装</s:String>
+  <s:String x:Key="Installing">正在安装</s:String>
+  <s:String x:Key="Downloading">正在下载安装包...</s:String>
+  <s:String x:Key="Verifying">正在校验文件完整性...</s:String>
+  <s:String x:Key="Extracting">正在解压文件...</s:String>
+  <s:String x:Key="InstallComplete">安装完成</s:String>
+  <s:String x:Key="InstallCompleteDesc">UotanToolbox 已成功安装到您的设备上。</s:String>
+  <s:String x:Key="LaunchApp">启动柚坛工具箱</s:String>
+  <s:String x:Key="AlreadyInstalled">已安装</s:String>
+  <s:String x:Key="AlreadyInstalledDesc">UotanToolbox 已安装在您的设备上。</s:String>
+  <s:String x:Key="Reinstall">重新安装</s:String>
+  <s:String x:Key="ConfirmExit">确定要退出安装吗？</s:String>
+  <s:String x:Key="ConfirmExitInstalling">安装尚未完成，确定要退出安装吗？</s:String>
+  <s:String x:Key="Yes">是</s:String>
+  <s:String x:Key="No">否</s:String>
+  <s:String x:Key="Ok">确定</s:String>
+  <s:String x:Key="Cancel">取消</s:String>
+  <s:String x:Key="LoadMirrorFailed">加载镜像列表失败</s:String>
+  <s:String x:Key="SpeedTesting">正在测速...</s:String>
+  <s:String x:Key="MirrorSpeedUnit">MB/s</s:String>
+  <s:String x:Key="Unreachable">不可用</s:String>
+</ResourceDictionary>

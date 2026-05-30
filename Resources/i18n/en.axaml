@@ -1,0 +1,36 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:s="clr-namespace:System;assembly=System.Runtime">
+  <s:String x:Key="AppTitle">UotanToolbox Installer</s:String>
+  <s:String x:Key="EulaTitle">End User License Agreement</s:String>
+  <s:String x:Key="EulaDesc">Please read and agree to the End User License Agreement to continue installation.</s:String>
+  <s:String x:Key="CreateShortcut">Create desktop shortcut</s:String>
+  <s:String x:Key="AgreeEula">I have read and agree to the End User License Agreement</s:String>
+  <s:String x:Key="InstallPath">Install Path</s:String>
+  <s:String x:Key="Browse">Browse</s:String>
+  <s:String x:Key="Start">Start</s:String>
+  <s:String x:Key="ChooseMirrorTitle">Choose Mirror</s:String>
+  <s:String x:Key="ChooseMirrorDesc">Please select a download mirror, we recommend the fastest one.</s:String>
+  <s:String x:Key="SpeedTest">Speed Test</s:String>
+  <s:String x:Key="Install">Install</s:String>
+  <s:String x:Key="Installing">Installing</s:String>
+  <s:String x:Key="Downloading">Downloading package...</s:String>
+  <s:String x:Key="Verifying">Verifying file integrity...</s:String>
+  <s:String x:Key="Extracting">Extracting files...</s:String>
+  <s:String x:Key="InstallComplete">Installation Complete</s:String>
+  <s:String x:Key="InstallCompleteDesc">UotanToolbox has been successfully installed on your device.</s:String>
+  <s:String x:Key="LaunchApp">Launch UotanToolbox</s:String>
+  <s:String x:Key="AlreadyInstalled">Already Installed</s:String>
+  <s:String x:Key="AlreadyInstalledDesc">UotanToolbox is already installed on your device.</s:String>
+  <s:String x:Key="Reinstall">Reinstall</s:String>
+  <s:String x:Key="ConfirmExit">Are you sure you want to exit?</s:String>
+  <s:String x:Key="ConfirmExitInstalling">Installation is not complete. Are you sure you want to exit?</s:String>
+  <s:String x:Key="Yes">Yes</s:String>
+  <s:String x:Key="No">No</s:String>
+  <s:String x:Key="Ok">OK</s:String>
+  <s:String x:Key="Cancel">Cancel</s:String>
+  <s:String x:Key="LoadMirrorFailed">Failed to load mirror list</s:String>
+  <s:String x:Key="SpeedTesting">Testing speed...</s:String>
+  <s:String x:Key="MirrorSpeedUnit">MB/s</s:String>
+  <s:String x:Key="Unreachable">Unreachable</s:String>
+</ResourceDictionary>
