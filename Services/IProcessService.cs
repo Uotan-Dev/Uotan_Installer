@@ -1,8 +1,8 @@
 namespace UotanInstaller.App.Services;
 
 /// <summary>
-/// <para>进程管理服务接口，提供进程查询、终止和启动功能</para>
-/// Process management service interface that provides process query, termination, and launch functionality
+/// <para>进程管理服务接口，提供进程查询和终止功能</para>
+/// Process management service interface that provides process query and termination functionality
 /// </summary>
 public interface IProcessService
 {
@@ -47,32 +47,4 @@ public interface IProcessService
     /// The exit code of the process
     /// </returns>
     int WaitForProcessExit(int pid);
-
-    /// <summary>
-    /// <para>以管理员权限运行程序</para>
-    /// Run a program with elevated (administrator) privileges
-    /// </summary>
-    /// <param name="programPath">
-    /// <para>程序路径</para>
-    /// The program path
-    /// </param>
-    /// <param name="args">
-    /// <para>可选的命令行参数</para>
-    /// Optional command line arguments
-    /// </param>
-    void RunElevated(string programPath, string? args = null);
-
-    /// <summary>
-    /// <para>以普通权限运行程序</para>
-    /// Run a program with normal privileges
-    /// </summary>
-    /// <param name="programPath">
-    /// <para>程序路径</para>
-    /// The program path
-    /// </param>
-    /// <param name="args">
-    /// <para>可选的命令行参数</para>
-    /// Optional command line arguments
-    /// </param>
-    void RunNormal(string programPath, string? args = null);
 }

@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using UotanInstaller.App.Services.Deployment;
+using UotanInstaller.App.Services.Deployment.Platforms;
 using UotanInstaller.App.ViewModels;
 
 namespace UotanInstaller.App.Services;
@@ -31,6 +33,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IDownloadService, DownloadService>();
         services.AddSingleton<IDialogService>(sp =>
             new DialogService(() => sp.GetRequiredService<WindowProvider>().Window));
+        services.AddSingleton<IPlatformDetector, PlatformDetector>();
+        services.AddSingleton<IPlatformAdapter>(sp =>
+            PlatformAdapterFactory.Create(sp.GetRequiredService<IPlatformDetector>()));
+        services.AddSingleton<IDeploymentRuleEngine, DeploymentRuleEngine>();
         services.AddSingleton<IInstallerService, InstallerService>();
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddSingleton<MainWindowViewModel>();

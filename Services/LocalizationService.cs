@@ -1,6 +1,6 @@
-using Avalonia.Controls;
-using Avalonia.Markup.Xaml;
+using Avalonia.Platform;
 using System.Globalization;
+using System.Xml;
 
 namespace UotanInstaller.App.Services;
 
@@ -10,6 +10,8 @@ namespace UotanInstaller.App.Services;
 /// </summary>
 public sealed class LocalizationService : ILocalizationService
 {
+    private const string XamlNamespace = "http://schemas.microsoft.com/winfx/2006/xaml";
+
     private readonly Dictionary<string, string> _strings = new();
     private string _currentLanguage = "chs";
 
@@ -49,14 +51,17 @@ public sealed class LocalizationService : ILocalizationService
         try
         {
             var uri = new Uri($"avares://UotanInstaller.App/Resources/i18n/{language}.axaml");
-            var resources = AvaloniaXamlLoader.Load(uri) as ResourceDictionary;
+            using var stream = AssetLoader.Open(uri);
+            using var reader = XmlReader.Create(stream);
 
-            if (resources != null)
+            while (reader.Read())
             {
-                foreach (var kvp in resources)
+                if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "String")
                 {
-                    if (kvp.Key is string key && kvp.Value is string value)
+                    var key = reader.GetAttribute("Key", XamlNamespace);
+                    if (key is not null)
                     {
+                        var value = reader.ReadElementContentAsString();
                         _strings[key] = value;
                     }
                 }

@@ -1,0 +1,67 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="UotanInstaller.App.Views.DialogWindow"
+        Title=""
+        Width="420"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Background="{DynamicResource SurfaceBrush}">
+
+  <Grid RowDefinitions="*,Auto">
+    <StackPanel Grid.Row="0"
+                Margin="24"
+                Spacing="16">
+
+      <StackPanel Orientation="Horizontal"
+                  Spacing="12">
+        <Panel Width="40" Height="40"
+               VerticalAlignment="Center">
+          <Border x:Name="ErrorIcon"
+                  IsVisible="False"
+                  CornerRadius="20"
+                  Background="{DynamicResource ErrorBrush}">
+            <TextBlock Text="!"
+                       FontSize="20"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center" />
+          </Border>
+          <Border x:Name="ConfirmIcon"
+                  IsVisible="True"
+                  CornerRadius="20"
+                  Background="{DynamicResource BrandBrush}">
+            <TextBlock Text="?"
+                       FontSize="20"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center" />
+          </Border>
+        </Panel>
+
+        <TextBlock x:Name="TitleText"
+                   FontSize="17"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource TextPrimaryBrush}"
+                   VerticalAlignment="Center" />
+      </StackPanel>
+
+      <TextBlock x:Name="MessageText"
+                 TextWrapping="Wrap"
+                 FontSize="14"
+                 Foreground="{DynamicResource TextSecondaryBrush}" />
+    </StackPanel>
+
+    <Border Grid.Row="1"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="0,1,0,0"
+            Padding="24,16">
+      <DockPanel x:Name="ButtonPanel"
+                 LastChildFill="False" />
+    </Border>
+  </Grid>
+
+</Window>

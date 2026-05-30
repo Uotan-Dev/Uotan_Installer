@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
 using UotanInstaller.App.Models;
 using UotanInstaller.App.Services;
-using InstallStep = UotanInstaller.Models.InstallStep;
+using UotanInstaller.App.Services.Deployment;
 
 namespace UotanInstaller.App.ViewModels;
 
@@ -274,8 +274,8 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// <para>安装命令，开始下载和安装流程。</para>
-    /// Install command that starts the download and installation flow.
+    /// <para>安装命令，基于部署配置执行完整的部署流程。</para>
+    /// Install command that executes the complete deployment process based on the deployment configuration.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanInstall))]
     private async Task InstallAsync()
@@ -298,35 +298,32 @@ public partial class MainWindowViewModel : ViewModelBase
 
         try
         {
-            var progress = new Progress<InstallProgress>(OnInstallProgress);
-            var success = await _installerService.StartInstallAsync(
-                SelectedMirror.Url,
-                PatchSha256,
-                IsOfflineMode,
-                InstallPath,
+            var configuration = new DeploymentConfiguration
+            {
+                AppName = "UotanToolboxNT",
+                InstallPath = InstallPath,
+                SelectedMirrorUrl = SelectedMirror.Url,
+                Sha256 = PatchSha256,
+                OfflineMode = IsOfflineMode,
+                CreateDesktopShortcut = IsCreateShortcut,
+                LaunchAfterInstall = false,
+            };
+
+            var progress = new Progress<DeploymentProgress>(OnDeploymentProgress);
+            var result = await _installerService.DeployAsync(
+                configuration,
                 progress,
                 _installCts.Token);
 
-            if (success)
+            if (result.IsSuccess)
             {
                 IsInstallSuccess = true;
                 CurrentStep = InstallStep.Finish;
-
-                if (IsCreateShortcut)
-                {
-                    try
-                    {
-                        _installerService?.CreateDesktopShortcut(InstallPath);
-                    }
-                    catch
-                    {
-                    }
-                }
             }
             else
             {
                 IsInstallFailed = true;
-                InstallStatusText = "安装失败";
+                InstallStatusText = result.ErrorMessage ?? "安装失败";
             }
         }
         catch (OperationCanceledException)
@@ -450,15 +447,26 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private void OnInstallProgress(InstallProgress progress)
+    private void OnDeploymentProgress(DeploymentProgress progress)
     {
         InstallProgressValue = progress.ProgressValue;
         InstallStatusText = progress.Message;
 
+        var targetKind = progress.Kind switch
+        {
+            DeploymentStepKind.Download => InstallProgressKind.Downloading,
+            DeploymentStepKind.Verify => InstallProgressKind.Verifying,
+            DeploymentStepKind.Extract => InstallProgressKind.Installing,
+            DeploymentStepKind.Configure => InstallProgressKind.Installing,
+            DeploymentStepKind.CreateShortcut => InstallProgressKind.Installing,
+            DeploymentStepKind.Launch => InstallProgressKind.Installing,
+            _ => InstallProgressKind.Installing,
+        };
+
         var activeIndex = -1;
         for (var i = 0; i < InstallSubSteps.Count; i++)
         {
-            if (InstallSubSteps[i].Kind == progress.Kind)
+            if (InstallSubSteps[i].Kind == targetKind)
             {
                 activeIndex = i;
                 break;
@@ -482,21 +490,12 @@ public partial class MainWindowViewModel : ViewModelBase
             }
         }
 
-        if (progress.Kind == InstallProgressKind.Completed)
+        if (progress.ProgressValue >= 1.0 && progress.Kind == DeploymentStepKind.Extract)
         {
             foreach (var subStep in InstallSubSteps)
             {
                 subStep.IsCompleted = true;
                 subStep.IsActive = false;
-            }
-        }
-        else if (progress.Kind == InstallProgressKind.Failed)
-        {
-            var activeStep = InstallSubSteps.FirstOrDefault(s => s.IsActive);
-            if (activeStep is not null)
-            {
-                activeStep.IsFailed = true;
-                activeStep.IsActive = false;
             }
         }
 

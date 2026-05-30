@@ -1,5 +1,4 @@
 using Avalonia;
-using System.Runtime.InteropServices;
 
 namespace UotanInstaller.App;
 
@@ -51,11 +50,18 @@ sealed class Program
             .WithInterFont()
             .LogToTrace();
 
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int MessageBox(IntPtr hWnd, string text, string caption, int type);
-
+    /// <summary>
+    /// <para>将致命错误信息写入标准错误流并以非零退出码终止进程。此方法可在任何平台上运行，不依赖任何平台特定的原生 API。</para>
+    /// Writes a fatal error message to the standard error stream and terminates the process with a non-zero exit code. This method runs on any platform without relying on platform-specific native APIs.
+    /// </summary>
+    /// <param name="message">
+    /// <para>要显示的错误信息。</para>
+    /// The error message to display.
+    /// </param>
     private static void ShowFatalError(string message)
     {
-        MessageBox(IntPtr.Zero, message, "柚坛工具箱部署器 - 致命错误", 0x10);
+        Console.Error.WriteLine("=== 柚坛工具箱部署器 - 致命错误 ===");
+        Console.Error.WriteLine(message);
+        Environment.Exit(1);
     }
 }

@@ -206,8 +206,7 @@
                   CornerRadius="32"
                   Background="{DynamicResource SuccessBrush}"
                   Margin="0,0,0,16">
-            <TextBlock Text="&#xE73E;"
-                       FontFamily="Segoe MDL2 Assets"
+            <TextBlock Text="✔"
                        FontSize="28"
                        Foreground="White"
                        HorizontalAlignment="Center"
@@ -238,8 +237,7 @@
                   CornerRadius="32"
                   Background="{DynamicResource BrandBrush}"
                   Margin="0,0,0,16">
-            <TextBlock Text="&#xE916;"
-                       FontFamily="Segoe MDL2 Assets"
+            <TextBlock Text="ℹ"
                        FontSize="28"
                        Foreground="White"
                        HorizontalAlignment="Center"

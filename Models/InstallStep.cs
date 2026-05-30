@@ -1,4 +1,4 @@
-namespace UotanInstaller.Models;
+namespace UotanInstaller.App.Models;
 
 /// <summary>
 /// <para>表示安装程序的步骤枚举。</para>

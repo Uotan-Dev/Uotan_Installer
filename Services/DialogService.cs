@@ -1,8 +1,6 @@
-using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Layout;
-using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using UotanInstaller.App.Views;
 
 namespace UotanInstaller.App.Services;
 
@@ -33,7 +31,8 @@ public sealed class DialogService : IDialogService
         var window = _windowProvider();
         if (window is null) return;
 
-        await ShowDialogAsync(window, title, message, MessageBoxButtons.Ok, isError: true);
+        var dialog = new DialogWindow();
+        await dialog.ShowDialogAsync(window, title, message, DialogButtonType.Ok, isError: true);
     }
 
     /// <inheritdoc/>
@@ -42,7 +41,8 @@ public sealed class DialogService : IDialogService
         var window = _windowProvider();
         if (window is null) return false;
 
-        var result = await ShowDialogAsync(window, title, message, MessageBoxButtons.YesNo, isError: false);
+        var dialog = new DialogWindow();
+        var result = await dialog.ShowDialogAsync(window, title, message, DialogButtonType.YesNo, isError: false);
         return result == DialogResult.Yes;
     }
 
@@ -78,185 +78,4 @@ public sealed class DialogService : IDialogService
         var result = await storageProvider.OpenFolderPickerAsync(folderPickerOptions);
         return result.Count > 0 ? result[0].TryGetLocalPath() : null;
     }
-
-    private static async Task<DialogResult> ShowDialogAsync(
-        Window owner, string title, string message, MessageBoxButtons buttons, bool isError)
-    {
-        var tcs = new TaskCompletionSource<DialogResult>();
-
-        var surfaceBrush = owner.Background ?? new SolidColorBrush(Color.FromRgb(243, 243, 243));
-        var surfaceVariantBrush = TryGetResourceBrush("SurfaceVariantBrush") ?? new SolidColorBrush(Color.FromRgb(232, 232, 232));
-        var textPrimaryBrush = TryGetResourceBrush("TextPrimaryBrush") ?? Brushes.Black;
-        var textSecondaryBrush = TryGetResourceBrush("TextSecondaryBrush") ?? new SolidColorBrush(Color.FromRgb(97, 97, 97));
-        var borderBrush = TryGetResourceBrush("BorderBrush") ?? new SolidColorBrush(Color.FromRgb(224, 224, 224));
-        var brandBrush = TryGetResourceBrush("BrandBrush") ?? new SolidColorBrush(Color.FromRgb(232, 93, 38));
-
-        var dialog = new Window
-        {
-            Title = title,
-            Width = 420,
-            SizeToContent = SizeToContent.Height,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            ShowInTaskbar = false,
-            Background = surfaceBrush,
-            FontFamily = owner.FontFamily,
-            Icon = owner.Icon,
-        };
-
-        var iconChar = "\uE921";
-
-        var contentPanel = new StackPanel
-        {
-            Margin = new Thickness(24, 24, 24, 0),
-            Spacing = 16,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-
-        var headerPanel = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = 12,
-        };
-
-        var iconBorder = new Border
-        {
-            Width = 40,
-            Height = 40,
-            CornerRadius = new CornerRadius(20),
-            Background = brandBrush,
-            VerticalAlignment = VerticalAlignment.Center,
-            Child = new TextBlock
-            {
-                Text = iconChar,
-                FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                FontSize = 18,
-                Foreground = Brushes.White,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-            },
-        };
-
-        var titleBlock = new TextBlock
-        {
-            Text = title,
-            FontSize = 17,
-            FontWeight = FontWeight.SemiBold,
-            Foreground = textPrimaryBrush,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-
-        headerPanel.Children.Add(iconBorder);
-        headerPanel.Children.Add(titleBlock);
-
-        var messageBlock = new TextBlock
-        {
-            Text = message,
-            TextWrapping = TextWrapping.Wrap,
-            FontSize = 14,
-            Foreground = textSecondaryBrush,
-            Margin = new Thickness(0, 0, 0, 8),
-        };
-
-        contentPanel.Children.Add(headerPanel);
-        contentPanel.Children.Add(messageBlock);
-
-        var buttonBorder = new Border
-        {
-            Background = surfaceVariantBrush,
-            Padding = new Thickness(24, 16),
-            Margin = new Thickness(0, 16, 0, 0),
-        };
-
-        var buttonPanel = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Spacing = 8,
-        };
-
-        void AddSecondaryButton(string label, DialogResult result)
-        {
-            var btn = new Button
-            {
-                Content = label,
-                MinWidth = 90,
-                MinHeight = 36,
-                CornerRadius = new CornerRadius(6),
-                Padding = new Thickness(20, 8),
-                Foreground = textPrimaryBrush,
-                Background = surfaceBrush,
-                BorderBrush = borderBrush,
-                BorderThickness = new Thickness(1),
-                FontWeight = FontWeight.Normal,
-                FontSize = 14,
-            };
-
-            btn.Click += (_, _) =>
-            {
-                tcs.TrySetResult(result);
-                dialog.Close();
-            };
-            buttonPanel.Children.Add(btn);
-        }
-
-        void AddPrimaryButton(string label, DialogResult result)
-        {
-            var btn = new Button
-            {
-                Content = label,
-                MinWidth = 90,
-                MinHeight = 36,
-                CornerRadius = new CornerRadius(6),
-                Padding = new Thickness(20, 8),
-                Foreground = Brushes.White,
-                Background = brandBrush,
-                BorderThickness = new Thickness(0),
-                FontWeight = FontWeight.SemiBold,
-                FontSize = 14,
-            };
-
-            btn.Click += (_, _) =>
-            {
-                tcs.TrySetResult(result);
-                dialog.Close();
-            };
-            buttonPanel.Children.Add(btn);
-        }
-
-        if (buttons == MessageBoxButtons.Ok)
-        {
-            AddPrimaryButton("确定", DialogResult.Ok);
-        }
-        else if (buttons == MessageBoxButtons.YesNo)
-        {
-            AddSecondaryButton("否", DialogResult.No);
-            AddPrimaryButton("是", DialogResult.Yes);
-        }
-
-        buttonBorder.Child = buttonPanel;
-
-        var dialogStack = new StackPanel { Spacing = 0 };
-        dialogStack.Children.Add(contentPanel);
-        dialogStack.Children.Add(buttonBorder);
-
-        dialog.Content = dialogStack;
-
-        await dialog.ShowDialog(owner);
-
-        return await tcs.Task;
-    }
-
-    private static IBrush? TryGetResourceBrush(string key)
-    {
-        if (Application.Current?.Resources.TryGetResource(key, null, out var resource) == true
-            && resource is IBrush brush)
-        {
-            return brush;
-        }
-        return null;
-    }
-
-    private enum DialogResult { Ok, Yes, No, Cancel }
-    private enum MessageBoxButtons { Ok, YesNo }
 }

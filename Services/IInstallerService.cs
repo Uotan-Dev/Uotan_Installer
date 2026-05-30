@@ -1,4 +1,5 @@
 using UotanInstaller.App.Models;
+using UotanInstaller.App.Services.Deployment;
 
 namespace UotanInstaller.App.Services;
 
@@ -23,38 +24,26 @@ public interface IInstallerService
     Task<InstallerConfig> GetConfigAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// <para>执行完整的安装流程</para>
-    /// Execute the complete installation process
+    /// <para>基于部署配置执行完整的部署流程，通过管线编排下载、校验、解压、创建快捷方式和启动应用等步骤</para>
+    /// Execute the complete deployment process based on the deployment configuration, orchestrating steps such as download, verify, extract, create shortcut, and launch via pipeline
     /// </summary>
-    /// <param name="mirrorUrl">
-    /// <para>镜像下载URL</para>
-    /// The mirror download URL
-    /// </param>
-    /// <param name="sha256">
-    /// <para>期望的SHA256校验值</para>
-    /// The expected SHA256 checksum
-    /// </param>
-    /// <param name="offlineMode">
-    /// <para>是否为离线安装模式</para>
-    /// Whether this is an offline installation mode
-    /// </param>
-    /// <param name="installPath">
-    /// <para>自定义安装路径，为 null 时使用默认路径</para>
-    /// Custom installation path, uses default path when null
+    /// <param name="configuration">
+    /// <para>部署配置信息，包含安装路径、下载源、文件规则及步骤开关等</para>
+    /// The deployment configuration containing install path, download sources, file rules, and step toggles
     /// </param>
     /// <param name="progress">
-    /// <para>安装进度回调</para>
-    /// The installation progress callback
+    /// <para>部署进度回调，可为 null</para>
+    /// The deployment progress callback, or null
     /// </param>
     /// <param name="cancellationToken">
     /// <para>取消令牌</para>
     /// Cancellation token
     /// </param>
     /// <returns>
-    /// <para>如果安装成功返回true，否则返回false</para>
-    /// True if installation succeeded; otherwise false
+    /// <para>部署管线的执行结果，包含成功状态、已完成步骤及错误信息</para>
+    /// The deployment pipeline execution result containing success status, completed steps, and error information
     /// </returns>
-    Task<bool> StartInstallAsync(string mirrorUrl, string sha256, bool offlineMode, string? installPath = null, IProgress<InstallProgress>? progress = null, CancellationToken cancellationToken = default);
+    Task<DeploymentResult> DeployAsync(DeploymentConfiguration configuration, IProgress<DeploymentProgress>? progress = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// <para>执行安装器自更新</para>
@@ -81,14 +70,22 @@ public interface IInstallerService
     void LaunchAndExit(string? installPath = null);
 
     /// <summary>
-    /// <para>创建桌面快捷方式</para>
-    /// Create a desktop shortcut
+    /// <para>异步创建桌面快捷方式</para>
+    /// Asynchronously create a desktop shortcut
     /// </summary>
     /// <param name="installPath">
     /// <para>自定义安装路径，为 null 时使用默认路径</para>
     /// Custom installation path, uses default path when null
     /// </param>
-    void CreateDesktopShortcut(string? installPath = null);
+    /// <param name="cancellationToken">
+    /// <para>取消令牌</para>
+    /// Cancellation token
+    /// </param>
+    /// <returns>
+    /// <para>表示异步操作的 Task</para>
+    /// A task representing the asynchronous operation
+    /// </returns>
+    Task CreateDesktopShortcutAsync(string? installPath = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// <para>清理安装过程中产生的临时文件</para>

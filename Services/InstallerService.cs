@@ -1,9 +1,7 @@
-using SharpCompress.Archives;
-using SharpCompress.Common;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Text.Json;
 using UotanInstaller.App.Models;
+using UotanInstaller.App.Services.Deployment;
+using UotanInstaller.App.Services.Deployment.Steps;
 
 namespace UotanInstaller.App.Services;
 
@@ -14,8 +12,6 @@ namespace UotanInstaller.App.Services;
 public sealed class InstallerService : IInstallerService
 {
     private const string AppName = "UotanToolbox";
-    private const string DefaultInstallDir = "UotanToolboxNT";
-    private const string PackageFileName = "UotanToolbox.zip";
 
     private readonly IReleaseApiService _releaseApiService;
     private readonly IFileService _fileService;
@@ -23,6 +19,8 @@ public sealed class InstallerService : IInstallerService
     private readonly IDialogService _dialogService;
     private readonly IHttpService _httpService;
     private readonly IProcessService _processService;
+    private readonly IPlatformDetector _platformDetector;
+    private readonly IPlatformAdapter _platformAdapter;
 
     /// <summary>
     /// <para>初始化 InstallerService 实例</para>
@@ -31,10 +29,6 @@ public sealed class InstallerService : IInstallerService
     /// <param name="releaseApiService">
     /// <para>API 服务</para>
     /// The API service
-    /// </param>
-    /// <param name="processService">
-    /// <para>进程管理服务</para>
-    /// The process management service
     /// </param>
     /// <param name="fileService">
     /// <para>文件服务</para>
@@ -52,125 +46,106 @@ public sealed class InstallerService : IInstallerService
     /// <para>HTTP 服务</para>
     /// The HTTP service
     /// </param>
+    /// <param name="processService">
+    /// <para>进程管理服务</para>
+    /// The process management service
+    /// </param>
+    /// <param name="platformDetector">
+    /// <para>平台检测器</para>
+    /// The platform detector
+    /// </param>
+    /// <param name="platformAdapter">
+    /// <para>平台适配器</para>
+    /// The platform adapter
+    /// </param>
     public InstallerService(
         IReleaseApiService releaseApiService,
-        IProcessService processService,
         IFileService fileService,
         IDownloadService downloadService,
         IDialogService dialogService,
-        IHttpService httpService)
+        IHttpService httpService,
+        IProcessService processService,
+        IPlatformDetector platformDetector,
+        IPlatformAdapter platformAdapter)
     {
         _releaseApiService = releaseApiService;
-        _processService = processService;
         _fileService = fileService;
         _downloadService = downloadService;
         _dialogService = dialogService;
         _httpService = httpService;
+        _processService = processService;
+        _platformDetector = platformDetector;
+        _platformAdapter = platformAdapter;
     }
 
     /// <inheritdoc/>
-    public async Task<InstallerConfig> GetConfigAsync(CancellationToken cancellationToken = default)
+    public Task<InstallerConfig> GetConfigAsync(CancellationToken cancellationToken = default)
     {
-        var installDir = GetInstallDirectory();
+        var installDir = _platformAdapter.GetDefaultInstallDirectory(AppName);
         var currVersion = TryGetInstalledVersion(installDir);
         var isUpdate = currVersion is not null;
 
-        return new InstallerConfig
+        var config = new InstallerConfig
         {
             Version = GetCurrentVersion(),
             IsUpdate = isUpdate,
             IsOfflineMode = false,
             CurrVersion = currVersion,
-            InstallPath = GetInstallDirectory(),
+            InstallPath = installDir,
         };
+
+        return Task.FromResult(config);
     }
 
     /// <inheritdoc/>
-    public async Task<bool> StartInstallAsync(string mirrorUrl, string sha256, bool offlineMode, string? installPath = null, IProgress<InstallProgress>? progress = null, CancellationToken cancellationToken = default)
+    public async Task<DeploymentResult> DeployAsync(DeploymentConfiguration configuration, IProgress<DeploymentProgress>? progress = null, CancellationToken cancellationToken = default)
     {
-        try
+        var installDir = configuration.InstallPath ?? _platformAdapter.GetDefaultInstallDirectory(AppName);
+        var tempDir = _platformAdapter.GetTempDirectory();
+        var packageFileName = configuration.PackageFileName ?? "UotanToolbox.zip";
+        var packagePath = Path.Combine(tempDir, packageFileName);
+
+        var pipeline = new DeploymentPipeline();
+
+        if (!configuration.OfflineMode)
         {
-            var installDir = installPath ?? GetInstallDirectory();
-            var tempDir = Path.GetTempPath();
-            var packagePath = Path.Combine(tempDir, PackageFileName);
+            var downloadUrl = configuration.SelectedMirrorUrl ?? configuration.PackageSources.FirstOrDefault()?.Url ?? string.Empty;
+            pipeline.AddStep(new DownloadStep(downloadUrl, packagePath, _downloadService));
 
-            if (!offlineMode)
+            if (!string.IsNullOrEmpty(configuration.Sha256))
             {
-                progress?.Report(new InstallProgress { Kind = InstallProgressKind.Downloading, Message = "正在下载安装包..." });
-
-                var downloadProgress = new Progress<(long Downloaded, long Total)>(p =>
-                {
-                    var percentage = p.Total > 0 ? (double)p.Downloaded / p.Total : 0;
-                    progress?.Report(new InstallProgress { Kind = InstallProgressKind.Downloading, Message = "正在下载...", ProgressValue = percentage });
-                });
-
-                await _downloadService.MultiThreadedDownloadAsync(mirrorUrl, packagePath, Environment.ProcessorCount, downloadProgress, cancellationToken).ConfigureAwait(false);
-
-                if (!string.IsNullOrEmpty(sha256))
-                {
-                    progress?.Report(new InstallProgress { Kind = InstallProgressKind.Verifying, Message = "正在校验文件完整性..." });
-                    var actualHash = await _fileService.ComputeSha256Async(packagePath, cancellationToken).ConfigureAwait(false);
-                    if (!string.Equals(actualHash, sha256, StringComparison.OrdinalIgnoreCase))
-                    {
-                        progress?.Report(new InstallProgress { Kind = InstallProgressKind.Failed, Message = "文件校验失败！" });
-                        return false;
-                    }
-                }
+                pipeline.AddStep(new VerifyStep(packagePath, configuration.Sha256, _fileService));
             }
+        }
 
-            progress?.Report(new InstallProgress { Kind = InstallProgressKind.Installing, Message = "正在安装应用..." });
+        pipeline.AddStep(new ExtractStep(packagePath, installDir, configuration.FileRules));
 
-            if (!Directory.Exists(installDir))
+        if (configuration.CreateDesktopShortcut)
+        {
+            var exePath = FindExecutable(installDir);
+            if (exePath is not null)
             {
-                Directory.CreateDirectory(installDir);
+                pipeline.AddStep(new CreateShortcutStep(AppName, exePath, _platformAdapter));
             }
+        }
 
-            await Task.Run(() =>
+        if (configuration.LaunchAfterInstall)
+        {
+            var exePath = FindExecutable(installDir);
+            if (exePath is not null)
             {
-                using var archive = ArchiveFactory.OpenArchive(packagePath);
-                var totalEntries = archive.Entries.Count(e => !e.IsDirectory);
-                var extractedCount = 0;
+                pipeline.AddStep(new LaunchStep(exePath, _platformAdapter));
+            }
+        }
 
-                foreach (var entry in archive.Entries.Where(e => !e.IsDirectory))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
+        var result = await pipeline.ExecuteAsync(progress, cancellationToken).ConfigureAwait(false);
 
-                    var destinationPath = Path.GetFullPath(Path.Combine(installDir, entry.Key ?? string.Empty));
-
-                    if (!destinationPath.StartsWith(installDir, StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    var dir = Path.GetDirectoryName(destinationPath);
-                    if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                    {
-                        Directory.CreateDirectory(dir);
-                    }
-
-                    entry.WriteToFile(destinationPath, new ExtractionOptions { Overwrite = true });
-                    extractedCount++;
-
-                    var percentage = (double)extractedCount / totalEntries;
-                    progress?.Report(new InstallProgress { Kind = InstallProgressKind.Installing, Message = "正在解压文件...", ProgressValue = percentage });
-                }
-            }, cancellationToken).ConfigureAwait(false);
-
+        if (result.IsSuccess)
+        {
             try { File.Delete(packagePath); } catch { }
+        }
 
-            progress?.Report(new InstallProgress { Kind = InstallProgressKind.Completed, Message = "安装完成" });
-            return true;
-        }
-        catch (OperationCanceledException)
-        {
-            progress?.Report(new InstallProgress { Kind = InstallProgressKind.Failed, Message = "安装已取消" });
-            return false;
-        }
-        catch (Exception ex)
-        {
-            progress?.Report(new InstallProgress { Kind = InstallProgressKind.Failed, Message = ex.Message });
-            return false;
-        }
+        return result;
     }
 
     /// <inheritdoc/>
@@ -242,21 +217,21 @@ public sealed class InstallerService : IInstallerService
             await File.WriteAllBytesAsync(exePath, newInstallerBytes, cancellationToken).ConfigureAwait(false);
         }
 
-        _processService.RunElevated(exePath);
+        _platformAdapter.RequestElevation(exePath);
         Environment.Exit(0);
     }
 
     /// <inheritdoc/>
     public void LaunchAndExit(string? installPath = null)
     {
-        var installDir = installPath ?? GetInstallDirectory();
+        var installDir = installPath ?? _platformAdapter.GetDefaultInstallDirectory(AppName);
         var exePath = FindExecutable(installDir);
 
         if (exePath is not null && File.Exists(exePath))
         {
             try
             {
-                _processService.RunNormal(exePath);
+                _platformAdapter.LaunchApplication(exePath);
             }
             catch (Exception)
             {
@@ -267,34 +242,22 @@ public sealed class InstallerService : IInstallerService
     }
 
     /// <inheritdoc/>
-    public void CreateDesktopShortcut(string? installPath = null)
+    public async Task CreateDesktopShortcutAsync(string? installPath = null, CancellationToken cancellationToken = default)
     {
-        var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-        var lnkPath = Path.Combine(desktopPath, "柚坛工具箱.lnk");
-        var installDir = installPath ?? GetInstallDirectory();
+        var installDir = installPath ?? _platformAdapter.GetDefaultInstallDirectory(AppName);
         var exePath = FindExecutable(installDir);
 
-        if (exePath is null) return;
-
-        if (!Directory.Exists(desktopPath))
+        if (exePath is not null)
         {
-            Directory.CreateDirectory(desktopPath);
+            await _platformAdapter.CreateDesktopShortcutAsync(AppName, exePath, ct: cancellationToken).ConfigureAwait(false);
         }
-
-        CreateShellShortcut(lnkPath, exePath);
     }
 
     /// <inheritdoc/>
     public async Task CleanupTempFilesAsync(CancellationToken cancellationToken = default)
     {
-        var tempDir = Path.GetTempPath();
-        await _fileService.CleanupTempFilesAsync(tempDir, PackageFileName, cancellationToken).ConfigureAwait(false);
-    }
-
-    private static string GetInstallDirectory()
-    {
-        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-        return Path.Combine(programFiles, DefaultInstallDir);
+        var tempDir = _platformAdapter.GetTempDirectory();
+        await _fileService.CleanupTempFilesAsync(tempDir, "UotanToolbox.zip", cancellationToken).ConfigureAwait(false);
     }
 
     private static string? TryGetInstalledVersion(string installDir)
@@ -329,64 +292,4 @@ public sealed class InstallerService : IInstallerService
         var version = Environment.Version;
         return $"{version.Major}.{version.Minor}.{version.Build}.0";
     }
-
-    private static void CreateShellShortcut(string lnkPath, string targetPath)
-    {
-        var shellLink = (IShellLinkW)new ShellLink();
-        shellLink.SetPath(targetPath);
-        shellLink.SetWorkingDirectory(Path.GetDirectoryName(targetPath) ?? string.Empty);
-
-        var persistFile = (IPersistFile)shellLink;
-        persistFile.Save(lnkPath, false);
-
-        Marshal.ReleaseComObject(persistFile);
-        Marshal.ReleaseComObject(shellLink);
-    }
-}
-
-[ComImport]
-[Guid("00021401-0000-0000-C000-000000000046")]
-[CoClass(typeof(ShellLinkClass))]
-internal interface ShellLink : IShellLinkW;
-
-[ComImport]
-[Guid("00021401-0000-0000-C000-000000000046")]
-internal class ShellLinkClass;
-
-[ComImport]
-[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-[Guid("000214F9-0000-0000-C000-000000000046")]
-internal interface IShellLinkW
-{
-    void GetPath([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszFile, int cch, IntPtr pfd, uint fFlags);
-    void GetIDList(out IntPtr ppidl);
-    void SetIDList(IntPtr pidl);
-    void GetDescription([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszName, int cch);
-    void SetDescription([MarshalAs(UnmanagedType.LPWStr)] string pszName);
-    void GetWorkingDirectory([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszDir, int cch);
-    void SetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] string pszDir);
-    void GetArguments([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszArgs, int cch);
-    void SetArguments([MarshalAs(UnmanagedType.LPWStr)] string pszArgs);
-    void GetHotkey(out short pwHotkey);
-    void SetHotkey(short wHotkey);
-    void GetShowCmd(out int piShowCmd);
-    void SetShowCmd(int iShowCmd);
-    void GetIconLocation([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszIconPath, int cch, out int piIcon);
-    void SetIconLocation([MarshalAs(UnmanagedType.LPWStr)] string pszIconPath, int iIcon);
-    void SetRelativePath([MarshalAs(UnmanagedType.LPWStr)] string pszPathRel, uint dwReserved);
-    void Resolve(IntPtr hwnd, uint fFlags);
-    void SetPath([MarshalAs(UnmanagedType.LPWStr)] string pszFile);
-}
-
-[ComImport]
-[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-[Guid("0000010b-0000-0000-C000-000000000046")]
-internal interface IPersistFile
-{
-    void GetClassID(out Guid pClassID);
-    void IsDirty();
-    void Load([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, uint dwMode);
-    void Save([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, bool fRemember);
-    void SaveCompleted([MarshalAs(UnmanagedType.LPWStr)] string pszFileName);
-    void GetCurFile([MarshalAs(UnmanagedType.LPWStr)] out string ppszFileName);
 }
