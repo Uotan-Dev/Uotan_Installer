@@ -97,6 +97,7 @@ public sealed class DeploymentPipeline : IDeploymentPipeline
                     Kind = step.Kind,
                     ProgressValue = overallProgress,
                     Message = _localizationService["Step_Skipped"],
+                    IsStepCompleted = true,
                 });
 
                 continue;
@@ -179,6 +180,7 @@ public sealed class DeploymentPipeline : IDeploymentPipeline
                 Kind = step.Kind,
                 ProgressValue = (double)(i + 1) / _steps.Count,
                 Message = $"{step.Name} {completedText}",
+                IsStepCompleted = true,
             });
         }
 

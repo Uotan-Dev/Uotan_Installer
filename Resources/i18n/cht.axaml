@@ -63,4 +63,8 @@
   <s:String x:Key="DiskSpaceInsufficient">磁碟空間不足</s:String>
   <s:String x:Key="SystemVersionInsufficient">系統版本不符合需求</s:String>
   <s:String x:Key="PlatformCheckFailed">平台檢查未通過</s:String>
+  <s:String x:Key="Notice">提示</s:String>
+  <s:String x:Key="RetryLimitReached">多次重試失敗，請檢查網路連線或聯絡支援。</s:String>
+  <s:String x:Key="SelfUpdateConfirm">偵測到新版本，是否立即更新？</s:String>
+  <s:String x:Key="SelectInstallPath">選擇安裝路徑</s:String>
 </ResourceDictionary>

@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using UotanInstaller.App.Services;
 
 namespace UotanInstaller.App.Views;
 
@@ -10,10 +11,21 @@ public enum DialogButtonType { Ok, YesNo }
 public partial class DialogWindow : Window
 {
     private TaskCompletionSource<DialogResult>? _tcs;
+    private readonly ILocalizationService _localizationService;
 
     public DialogWindow()
     {
+        // 为设计器保留的构造函数
         InitializeComponent();
+        _localizationService = new LocalizationService();
+        KeyDown += OnKeyDown;
+        Closed += OnClosed;
+    }
+
+    public DialogWindow(ILocalizationService localizationService)
+    {
+        InitializeComponent();
+        _localizationService = localizationService;
         KeyDown += OnKeyDown;
         Closed += OnClosed;
     }
@@ -46,17 +58,17 @@ public partial class DialogWindow : Window
 
         if (buttonType == DialogButtonType.Ok)
         {
-            var btn = CreatePrimaryButton("确定", DialogResult.Ok);
+            var btn = CreatePrimaryButton(_localizationService["Ok"], DialogResult.Ok);
             DockPanel.SetDock(btn, Dock.Right);
             ButtonPanel.Children.Add(btn);
         }
         else
         {
-            var secondaryBtn = CreateSecondaryButton("否", DialogResult.No);
+            var secondaryBtn = CreateSecondaryButton(_localizationService["No"], DialogResult.No);
             DockPanel.SetDock(secondaryBtn, Dock.Left);
             ButtonPanel.Children.Add(secondaryBtn);
 
-            var primaryBtn = CreatePrimaryButton("是", DialogResult.Yes);
+            var primaryBtn = CreatePrimaryButton(_localizationService["Yes"], DialogResult.Yes);
             DockPanel.SetDock(primaryBtn, Dock.Right);
             ButtonPanel.Children.Add(primaryBtn);
         }

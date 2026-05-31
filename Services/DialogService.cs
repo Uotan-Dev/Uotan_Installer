@@ -5,12 +5,13 @@ using UotanInstaller.App.Views;
 namespace UotanInstaller.App.Services;
 
 /// <summary>
-/// <para>对话框服务实现，提供Avalonia对话框封装</para>
+/// 对话框服务实现，提供Avalonia对话框封装
 /// Dialog service implementation that provides Avalonia dialog wrappers
 /// </summary>
 public sealed class DialogService : IDialogService
 {
     private readonly Func<Window?> _windowProvider;
+    private readonly ILocalizationService _localizationService;
 
     /// <summary>
     /// <para>初始化DialogService实例</para>
@@ -20,9 +21,14 @@ public sealed class DialogService : IDialogService
     /// <para>提供当前活动窗口的函数</para>
     /// A function that provides the current active window
     /// </param>
-    public DialogService(Func<Window?> windowProvider)
+    /// <param name="localizationService">
+    /// <para>本地化服务实例</para>
+    /// Localization service instance
+    /// </param>
+    public DialogService(Func<Window?> windowProvider, ILocalizationService localizationService)
     {
         _windowProvider = windowProvider;
+        _localizationService = localizationService;
     }
 
     /// <inheritdoc/>
@@ -31,7 +37,7 @@ public sealed class DialogService : IDialogService
         var window = _windowProvider();
         if (window is null) return;
 
-        var dialog = new DialogWindow();
+        var dialog = new DialogWindow(_localizationService);
         await dialog.ShowDialogAsync(window, title, message, DialogButtonType.Ok, isError: true);
     }
 
@@ -41,7 +47,7 @@ public sealed class DialogService : IDialogService
         var window = _windowProvider();
         if (window is null) return false;
 
-        var dialog = new DialogWindow();
+        var dialog = new DialogWindow(_localizationService);
         var result = await dialog.ShowDialogAsync(window, title, message, DialogButtonType.YesNo, isError: false);
         return result == DialogResult.Yes;
     }

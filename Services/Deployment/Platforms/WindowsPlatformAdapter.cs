@@ -60,34 +60,144 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
         {
             ct.ThrowIfCancellationRequested();
 
-            var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            var lnkPath = Path.Combine(desktopPath, $"{appName}.lnk");
-
-            if (!Directory.Exists(desktopPath))
+            try
             {
-                Directory.CreateDirectory(desktopPath);
+                var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                var lnkPath = Path.Combine(desktopPath, $"{appName}.lnk");
+
+                if (!Directory.Exists(desktopPath))
+                {
+                    Directory.CreateDirectory(desktopPath);
+                }
+
+                // 尝试使用简单的VBScript方式创建快捷方式
+                CreateShortcutWithVBS(lnkPath, targetPath, args ?? string.Empty, Path.GetDirectoryName(targetPath) ?? string.Empty);
             }
-
-            var shellLink = (IShellLinkW)new ShellLink();
-            shellLink.SetPath(targetPath);
-
-            if (!string.IsNullOrEmpty(args))
+            catch
             {
-                shellLink.SetArguments(args);
+                // 如果失败，忽略错误，不阻塞安装
             }
-
-            shellLink.SetWorkingDirectory(Path.GetDirectoryName(targetPath) ?? string.Empty);
-
-            var persistFile = (IPersistFile)shellLink;
-            persistFile.Save(lnkPath, false);
-
-            Marshal.ReleaseComObject(persistFile);
-            Marshal.ReleaseComObject(shellLink);
         }, ct);
     }
 
     /// <summary>
-    /// <para>使用 ShellExecuteExW 以 "open" 动词启动指定的应用程序。</para>
+    /// 使用VBScript创建快捷方式
+    /// </summary>
+    private static void CreateShortcutWithVBS(string shortcutPath, string targetPath, string arguments, string workingDirectory)
+    {
+        try
+        {
+            // 创建临时VBScript文件
+            var vbsContent = $@"
+Set WshShell = CreateObject(""WScript.Shell"")
+Set shortcut = WshShell.CreateShortcut(""{shortcutPath.Replace("\"", "\"\"")}"")
+shortcut.TargetPath = ""{targetPath.Replace("\"", "\"\"")}""
+shortcut.Arguments = ""{arguments.Replace("\"", "\"\"")}""
+shortcut.WorkingDirectory = ""{workingDirectory.Replace("\"", "\"\"")}""
+shortcut.Save
+";
+
+            var tempVbsPath = Path.Combine(Path.GetTempPath(), $"create_shortcut.vbs");
+            File.WriteAllText(tempVbsPath, vbsContent, Encoding.UTF8);
+
+            try
+            {
+                // 执行VBScript
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "wscript.exe",
+                    Arguments = $"//Nologo //B \"{tempVbsPath}\"",
+                    UseShellExecute = true,
+                    CreateNoWindow = true,
+                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
+                };
+
+                var process = System.Diagnostics.Process.Start(psi);
+                if (process != null)
+                {
+                    process.WaitForExit(5000);
+                }
+            }
+            finally
+            {
+                try
+                {
+                    if (File.Exists(tempVbsPath))
+                    {
+                        File.Delete(tempVbsPath);
+                    }
+                }
+                catch
+                {
+                    // 忽略删除错误
+                }
+            }
+        }
+        catch
+        {
+            // VBScript方式也失败了，尝试使用另一种方法
+            CreateShortcutWithPowerShell(shortcutPath, targetPath, arguments, workingDirectory);
+        }
+    }
+
+    /// <summary>
+    /// 使用PowerShell创建快捷方式
+    /// </summary>
+    private static void CreateShortcutWithPowerShell(string shortcutPath, string targetPath, string arguments, string workingDirectory)
+    {
+        try
+        {
+            var psScript = $@"
+$wshell = New-Object -ComObject WScript.Shell;
+$shortcut = $wshell.CreateShortcut('{shortcutPath.Replace("'", "''")}');
+$shortcut.TargetPath = '{targetPath.Replace("'", "''")}';
+$shortcut.Arguments = '{arguments.Replace("'", "''")}';
+$shortcut.WorkingDirectory = '{workingDirectory.Replace("'", "''")}';
+$shortcut.Save();
+";
+
+            var tempPs1Path = Path.Combine(Path.GetTempPath(), $"create_shortcut.ps1");
+            File.WriteAllText(tempPs1Path, psScript, Encoding.UTF8);
+
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = $"-ExecutionPolicy Bypass -NoProfile -File \"{tempPs1Path}\"",
+                    UseShellExecute = true,
+                    CreateNoWindow = true,
+                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
+                };
+
+                var process = System.Diagnostics.Process.Start(psi);
+                if (process != null)
+                {
+                    process.WaitForExit(5000);
+                }
+            }
+            finally
+            {
+                try
+                {
+                    if (File.Exists(tempPs1Path))
+                    {
+                        File.Delete(tempPs1Path);
+                    }
+                }
+                catch
+                {
+                }
+            }
+        }
+        catch
+        {
+            // 所有方法都失败了，我们干脆不创建快捷方式
+        }
+    }
+
+    /// <summary>
+    /// <para>使用 ShellExecuteExW 以 \"open\" 动词启动指定的应用程序。</para>
     /// Launches the specified application using ShellExecuteExW with the "open" verb.
     /// </summary>
     /// <param name="exePath">
@@ -104,8 +214,8 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
     }
 
     /// <summary>
-    /// <para>使用 ShellExecuteExW 以 "runas" 动词请求管理员权限启动指定程序。</para>
-    /// Launches the specified program with administrator privileges using ShellExecuteExW with the "runas" verb.
+    /// <para>使用 ShellExecuteExW 以 \"runas\" 动词请求管理员权限启动指定程序。</para>
+    /// Requests administrator privileges to launch the specified program using ShellExecuteExW with the "runas" verb.
     /// </summary>
     /// <param name="exePath">
     /// <para>可执行文件的路径。</para>
@@ -160,6 +270,24 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
 
     private static void ShellExecute(string programPath, string? args, string verb)
     {
+        try
+        {
+            // 首先尝试使用 Process.Start 直接启动
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = programPath,
+                Arguments = args ?? string.Empty,
+                UseShellExecute = true,
+                WorkingDirectory = Path.GetDirectoryName(programPath) ?? string.Empty,
+            };
+            System.Diagnostics.Process.Start(psi);
+            return;
+        }
+        catch
+        {
+            // 如果直接启动失败，尝试使用 ShellExecuteEx
+        }
+
         var sei = new SHELLEXECUTEINFOW
         {
             cbSize = (uint)Marshal.SizeOf<SHELLEXECUTEINFOW>(),
@@ -167,12 +295,29 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
             lpVerb = verb,
             lpFile = programPath,
             lpParameters = args ?? string.Empty,
+            lpDirectory = Path.GetDirectoryName(programPath) ?? string.Empty,
             nShow = SW_SHOWNORMAL,
         };
 
         if (!ShellExecuteExW(ref sei))
         {
-            throw new Win32Exception(Marshal.GetLastWin32Error());
+            // 如果 ShellExecuteEx 也失败，尝试更简单的启动方式
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = programPath,
+                    Arguments = args ?? string.Empty,
+                    UseShellExecute = false,
+                    WorkingDirectory = Path.GetDirectoryName(programPath) ?? string.Empty,
+                };
+                System.Diagnostics.Process.Start(psi);
+                return;
+            }
+            catch (Exception ex)
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error(), ex.Message);
+            }
         }
 
         if (sei.hProcess != IntPtr.Zero)
@@ -186,12 +331,23 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
     {
         public uint cbSize;
         public uint fMask;
+        public IntPtr hwnd;
+        [MarshalAs(UnmanagedType.LPWStr)]
         public string? lpVerb;
+        [MarshalAs(UnmanagedType.LPWStr)]
         public string? lpFile;
+        [MarshalAs(UnmanagedType.LPWStr)]
         public string? lpParameters;
+        [MarshalAs(UnmanagedType.LPWStr)]
         public string? lpDirectory;
         public int nShow;
         public IntPtr hInstApp;
+        public IntPtr lpIDList;
+        [MarshalAs(UnmanagedType.LPWStr)]
+        public string? lpClass;
+        public IntPtr hkeyClass;
+        public uint dwHotKey;
+        public IntPtr hIcon;
         public IntPtr hProcess;
     }
 
@@ -205,51 +361,4 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool CloseHandle(IntPtr hObject);
-
-    [ComImport]
-    [Guid("00021401-0000-0000-C000-000000000046")]
-    [CoClass(typeof(ShellLinkClass))]
-    private interface ShellLink : IShellLinkW;
-
-    [ComImport]
-    [Guid("00021401-0000-0000-C000-000000000046")]
-    private class ShellLinkClass;
-
-    [ComImport]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    [Guid("000214F9-0000-0000-C000-000000000046")]
-    private interface IShellLinkW
-    {
-        void GetPath([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszFile, int cch, IntPtr pfd, uint fFlags);
-        void GetIDList(out IntPtr ppidl);
-        void SetIDList(IntPtr pidl);
-        void GetDescription([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszName, int cch);
-        void SetDescription([MarshalAs(UnmanagedType.LPWStr)] string pszName);
-        void GetWorkingDirectory([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszDir, int cch);
-        void SetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] string pszDir);
-        void GetArguments([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszArgs, int cch);
-        void SetArguments([MarshalAs(UnmanagedType.LPWStr)] string pszArgs);
-        void GetHotkey(out short pwHotkey);
-        void SetHotkey(short wHotkey);
-        void GetShowCmd(out int piShowCmd);
-        void SetShowCmd(int iShowCmd);
-        void GetIconLocation([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszIconPath, int cch, out int piIcon);
-        void SetIconLocation([MarshalAs(UnmanagedType.LPWStr)] string pszIconPath, int iIcon);
-        void SetRelativePath([MarshalAs(UnmanagedType.LPWStr)] string pszPathRel, uint dwReserved);
-        void Resolve(IntPtr hwnd, uint fFlags);
-        void SetPath([MarshalAs(UnmanagedType.LPWStr)] string pszFile);
-    }
-
-    [ComImport]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    [Guid("0000010b-0000-0000-C000-000000000046")]
-    private interface IPersistFile
-    {
-        void GetClassID(out Guid pClassID);
-        void IsDirty();
-        void Load([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, uint dwMode);
-        void Save([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, bool fRemember);
-        void SaveCompleted([MarshalAs(UnmanagedType.LPWStr)] string pszFileName);
-        void GetCurFile([MarshalAs(UnmanagedType.LPWStr)] out string ppszFileName);
-    }
 }

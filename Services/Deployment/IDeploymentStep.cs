@@ -158,4 +158,10 @@ public sealed class DeploymentProgress
     /// Gets or initializes the progress description message.
     /// </summary>
     public string Message { get; init; } = string.Empty;
+
+    /// <summary>
+    /// <para>获取或初始化当前步骤是否已完成。</para>
+    /// Gets or initializes whether the current step has completed.
+    /// </summary>
+    public bool IsStepCompleted { get; init; }
 }

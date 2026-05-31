@@ -314,14 +314,7 @@ public sealed class InstallerService : IInstallerService
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to launch application: {ex.Message}");
-                var launchFailedText = _localizationService["LaunchFailed"];
-                try
-                {
-                    _dialogService.ShowErrorAsync(launchFailedText, ex.Message).GetAwaiter().GetResult();
-                }
-                catch
-                {
-                }
+                // 启动失败时，直接退出安装程序而不阻塞，不显示错误对话框
             }
         }
 

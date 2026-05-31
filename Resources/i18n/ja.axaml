@@ -63,4 +63,8 @@
   <s:String x:Key="DiskSpaceInsufficient">ディスク容量が不足しています</s:String>
   <s:String x:Key="SystemVersionInsufficient">システムバージョンが要件を満たしていません</s:String>
   <s:String x:Key="PlatformCheckFailed">プラットフォームチェックに失敗しました</s:String>
+  <s:String x:Key="Notice">お知らせ</s:String>
+  <s:String x:Key="RetryLimitReached">再試行回数が上限に達しました。ネットワーク接続を確認するか、サポートにお問い合わせください。</s:String>
+  <s:String x:Key="SelfUpdateConfirm">新しいバージョンが利用可能です。今すぐ更新しますか？</s:String>
+  <s:String x:Key="SelectInstallPath">インストールパスを選択</s:String>
 </ResourceDictionary>

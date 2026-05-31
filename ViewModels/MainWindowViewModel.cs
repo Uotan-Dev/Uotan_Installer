@@ -78,7 +78,64 @@ public partial class MainWindowViewModel : ViewModelBase
         _localizationService = localizationService;
         _platformAdapter = platformAdapter;
         _platformDetector = platformDetector;
+
+        if (_localizationService is not null)
+        {
+            _localizationService.LanguageChanged += OnLanguageChanged;
+        }
     }
+
+    private string L(string key, string fallback) => _localizationService?[key] ?? fallback;
+
+    private void OnLanguageChanged(string _)
+    {
+        OnPropertyChanged(nameof(AppTitle));
+        OnPropertyChanged(nameof(EulaTitle));
+        OnPropertyChanged(nameof(EulaDesc));
+        OnPropertyChanged(nameof(CreateShortcutText));
+        OnPropertyChanged(nameof(InstallPathText));
+        OnPropertyChanged(nameof(BrowseText));
+        OnPropertyChanged(nameof(AgreeEulaText));
+        OnPropertyChanged(nameof(StartText));
+        OnPropertyChanged(nameof(ChooseMirrorTitleText));
+        OnPropertyChanged(nameof(ChooseMirrorDescText));
+        OnPropertyChanged(nameof(SpeedTestText));
+        OnPropertyChanged(nameof(InstallingText));
+        OnPropertyChanged(nameof(RetryText));
+        OnPropertyChanged(nameof(InstallCompleteText));
+        OnPropertyChanged(nameof(InstallCompleteDescText));
+        OnPropertyChanged(nameof(OpenInstallDirText));
+        OnPropertyChanged(nameof(LaunchAppText));
+        OnPropertyChanged(nameof(AlreadyInstalledText));
+        OnPropertyChanged(nameof(AlreadyInstalledDescText));
+        OnPropertyChanged(nameof(ReinstallText));
+        OnPropertyChanged(nameof(InstallButtonText));
+    }
+
+    #region Localization Properties
+
+    public string AppTitle => L("AppTitle", "柚坛工具箱部署器");
+    public string EulaTitle => L("EulaTitle", "用户协议");
+    public string EulaDesc => L("EulaDesc", "请阅读并同意最终用户许可协议后继续安装。");
+    public string CreateShortcutText => L("CreateShortcut", "创建桌面快捷方式");
+    public string InstallPathText => L("InstallPath", "安装路径");
+    public string BrowseText => L("Browse", "浏览");
+    public string AgreeEulaText => L("AgreeEula", "我已阅读并同意最终用户许可协议");
+    public string StartText => L("Start", "开始");
+    public string ChooseMirrorTitleText => L("ChooseMirrorTitle", "选择镜像源");
+    public string ChooseMirrorDescText => L("ChooseMirrorDesc", "请选择一个下载镜像源，推荐选择速度最快的镜像。");
+    public string SpeedTestText => L("SpeedTest", "测速");
+    public string InstallingText => L("Installing", "正在安装");
+    public string RetryText => L("Retry", "重试");
+    public string InstallCompleteText => L("InstallComplete", "安装完成");
+    public string InstallCompleteDescText => L("InstallCompleteDesc", "UotanToolbox 已成功安装到您的设备上。");
+    public string OpenInstallDirText => L("OpenInstallDir", "打开安装目录");
+    public string LaunchAppText => L("LaunchApp", "启动柚坛工具箱");
+    public string AlreadyInstalledText => L("AlreadyInstalled", "已安装");
+    public string AlreadyInstalledDescText => L("AlreadyInstalledDesc", "UotanToolbox 已安装在您的设备上。");
+    public string ReinstallText => L("Reinstall", "重新安装");
+
+    #endregion
 
     #region Step Visibility
 
@@ -216,7 +273,7 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <para>获取安装按钮的显示文本。</para>
     /// Gets the display text for the install button.
     /// </summary>
-    public string InstallButtonText => IsUpdate ? (_localizationService?["Update"] ?? "更新") : "安装";
+    public string InstallButtonText => IsUpdate ? L("Update", "更新") : L("Install", "安装");
 
     partial void OnIsUpdateChanged(bool value) => OnPropertyChanged(nameof(InstallButtonText));
 
@@ -229,7 +286,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (_dialogService is null) return;
 
-        var selectedPath = await _dialogService.BrowseFolderAsync("选择安装路径", InstallPath);
+        var selectedPath = await _dialogService.BrowseFolderAsync(L("SelectInstallPath", "选择安装路径"), InstallPath);
         if (selectedPath is not null)
         {
             InstallPath = selectedPath;
@@ -313,14 +370,21 @@ public partial class MainWindowViewModel : ViewModelBase
         CurrentStep = InstallStep.Installing;
         IsInstallFailed = false;
         InstallProgressValue = 0;
-        InstallStatusText = _localizationService?["PrepareInstall"] ?? "准备安装...";
+        InstallStatusText = L("PrepareInstall", "准备安装...");
 
-        InstallSubSteps =
-        [
-            new() { DisplayName = _localizationService?["Step_Download"] ?? "下载安装包", Kind = InstallProgressKind.Downloading },
-            new() { DisplayName = _localizationService?["Step_Verify"] ?? "校验文件完整性", Kind = InstallProgressKind.Verifying },
-            new() { DisplayName = _localizationService?["Step_Extract"] ?? "安装应用", Kind = InstallProgressKind.Installing },
-        ];
+        var steps = new ObservableCollection<InstallSubStepItem>
+        {
+            new() { DisplayName = L("Step_Download", "下载安装包"), Kind = InstallProgressKind.Downloading },
+            new() { DisplayName = L("Step_Verify", "校验文件完整性"), Kind = InstallProgressKind.Verifying },
+            new() { DisplayName = L("Step_Extract", "安装应用"), Kind = InstallProgressKind.Installing },
+        };
+
+        if (IsCreateShortcut)
+        {
+            steps.Add(new() { DisplayName = L("Step_CreateShortcut", "创建快捷方式"), Kind = InstallProgressKind.Installing });
+        }
+
+        InstallSubSteps = steps;
 
         _installCts = new CancellationTokenSource();
 
@@ -345,15 +409,15 @@ public partial class MainWindowViewModel : ViewModelBase
                     if (!checkResult)
                     {
                         IsInstallFailed = true;
-                        InstallStatusText = _localizationService?["PlatformCheckFailed"] ?? "平台检查未通过";
-                        await (_dialogService?.ShowErrorAsync(_localizationService?["PlatformCheckFailed"] ?? "平台检查未通过", _localizationService?["DiskSpaceInsufficient"] ?? "磁盘空间不足") ?? Task.CompletedTask);
+                        InstallStatusText = L("PlatformCheckFailed", "平台检查未通过");
+                        await (_dialogService?.ShowErrorAsync(L("PlatformCheckFailed", "平台检查未通过"), L("DiskSpaceInsufficient", "磁盘空间不足")) ?? Task.CompletedTask);
                         return;
                     }
                 }
                 catch (Exception ex)
                 {
                     IsInstallFailed = true;
-                    InstallStatusText = $"{_localizationService?["PlatformCheckFailed"] ?? "平台检查未通过"}: {ex.Message}";
+                    InstallStatusText = $"{L("PlatformCheckFailed", "平台检查未通过")}: {ex.Message}";
                     return;
                 }
             }
@@ -383,19 +447,19 @@ public partial class MainWindowViewModel : ViewModelBase
             else
             {
                 IsInstallFailed = true;
-                InstallStatusText = result.ErrorMessage ?? (_localizationService?["InstallFailed"] ?? "安装失败");
+                InstallStatusText = result.ErrorMessage ?? L("InstallFailed", "安装失败");
             }
         }
         catch (OperationCanceledException)
         {
             IsInstallFailed = true;
-            InstallStatusText = _localizationService?["InstallCancelled"] ?? "安装已取消";
+            InstallStatusText = L("InstallCancelled", "安装已取消");
         }
         catch (Exception ex)
         {
             IsInstallFailed = true;
-            InstallStatusText = $"{_localizationService?["InstallFailed"] ?? "安装失败"}: {ex.Message}";
-            await _dialogService.ShowErrorAsync(_localizationService?["InstallFailed"] ?? "安装失败", ex.Message);
+            InstallStatusText = $"{L("InstallFailed", "安装失败")}: {ex.Message}";
+            await _dialogService.ShowErrorAsync(L("InstallFailed", "安装失败"), ex.Message);
         }
         finally
         {
@@ -448,8 +512,8 @@ public partial class MainWindowViewModel : ViewModelBase
         if (RetryCount >= 3)
         {
             await _dialogService.ShowErrorAsync(
-                _localizationService?["InstallFailed"] ?? "安装失败",
-                "多次重试失败，请检查网络连接或联系支持。");
+                L("InstallFailed", "安装失败"),
+                L("RetryLimitReached", "多次重试失败，请检查网络连接或联系支持。"));
             return;
         }
 
@@ -492,7 +556,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
         catch
         {
-            VersionText = _localizationService?["VersionUnavailable"] ?? "获取失败";
+            VersionText = L("VersionUnavailable", "获取失败");
         }
     }
 
@@ -512,8 +576,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
             if (!hasUpdate) return;
 
-            var updateText = _localizationService?["Update"] ?? "更新";
-            var confirmed = await _dialogService.ShowConfirmAsync(updateText, "检测到新版本，是否立即更新？").ConfigureAwait(false);
+            var updateText = L("Update", "更新");
+            var confirmed = await _dialogService.ShowConfirmAsync(updateText, L("SelfUpdateConfirm", "检测到新版本，是否立即更新？")).ConfigureAwait(false);
             if (!confirmed) return;
 
             await _installerService.SelfUpdateAsync().ConfigureAwait(false);
@@ -565,7 +629,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            await _dialogService.ShowErrorAsync("加载镜像列表失败", ex.Message);
+            await _dialogService.ShowErrorAsync(L("LoadMirrorFailed", "加载镜像列表失败"), ex.Message);
         }
         finally
         {
@@ -605,24 +669,24 @@ public partial class MainWindowViewModel : ViewModelBase
             var subStep = InstallSubSteps[i];
             if (i == activeIndex)
             {
-                subStep.IsActive = true;
-                subStep.IsCompleted = false;
-                subStep.IsFailed = false;
+                if (progress.IsStepCompleted)
+                {
+                    subStep.IsActive = false;
+                    subStep.IsCompleted = true;
+                    subStep.IsFailed = false;
+                }
+                else
+                {
+                    subStep.IsActive = true;
+                    subStep.IsCompleted = false;
+                    subStep.IsFailed = false;
+                }
             }
             else if (i < activeIndex)
             {
                 subStep.IsCompleted = true;
                 subStep.IsActive = false;
                 subStep.IsFailed = false;
-            }
-        }
-
-        if (progress.ProgressValue >= 1.0 && progress.Kind == DeploymentStepKind.Extract)
-        {
-            foreach (var subStep in InstallSubSteps)
-            {
-                subStep.IsCompleted = true;
-                subStep.IsActive = false;
             }
         }
 
@@ -643,10 +707,10 @@ public partial class MainWindowViewModel : ViewModelBase
 
         if (CurrentStep == InstallStep.Installing)
         {
-            return await _dialogService.ShowConfirmAsync("提示", "安装尚未完成，确定要退出安装吗？");
+            return await _dialogService.ShowConfirmAsync(L("Notice", "提示"), L("ConfirmExitInstalling", "安装尚未完成，确定要退出安装吗？"));
         }
 
-        return await _dialogService.ShowConfirmAsync("提示", "确定要退出安装吗？");
+        return await _dialogService.ShowConfirmAsync(L("Notice", "提示"), L("ConfirmExit", "确定要退出安装吗？"));
     }
 
     #endregion
@@ -674,17 +738,79 @@ public sealed class InstallSubStepItem : ObservableObject
     /// <para>获取或设置子步骤是否已完成。</para>
     /// Gets or sets whether the sub-step is completed.
     /// </summary>
-    public bool IsCompleted { get; set => SetProperty(ref field, value); }
+    public bool IsCompleted
+    {
+        get;
+        set
+        {
+            if (SetProperty(ref field, value))
+            {
+                OnPropertyChanged(nameof(StatusIcon));
+                OnPropertyChanged(nameof(StatusBrush));
+                OnPropertyChanged(nameof(StatusForeground));
+            }
+        }
+    }
 
     /// <summary>
     /// <para>获取或设置子步骤是否正在进行。</para>
     /// Gets or sets whether the sub-step is currently active.
     /// </summary>
-    public bool IsActive { get; set => SetProperty(ref field, value); }
+    public bool IsActive
+    {
+        get;
+        set
+        {
+            if (SetProperty(ref field, value))
+            {
+                OnPropertyChanged(nameof(StatusIcon));
+                OnPropertyChanged(nameof(StatusBrush));
+                OnPropertyChanged(nameof(StatusForeground));
+            }
+        }
+    }
 
     /// <summary>
     /// <para>获取或设置子步骤是否失败。</para>
     /// Gets or sets whether the sub-step has failed.
     /// </summary>
-    public bool IsFailed { get; set => SetProperty(ref field, value); }
+    public bool IsFailed
+    {
+        get;
+        set
+        {
+            if (SetProperty(ref field, value))
+            {
+                OnPropertyChanged(nameof(StatusIcon));
+                OnPropertyChanged(nameof(StatusBrush));
+                OnPropertyChanged(nameof(StatusForeground));
+            }
+        }
+    }
+
+    /// <summary>
+    /// <para>获取步骤状态图标文本。</para>
+    /// Gets the status icon text for the sub-step.
+    /// </summary>
+    public string StatusIcon => IsFailed ? "✗" : IsCompleted ? "✓" : IsActive ? "●" : "○";
+
+    /// <summary>
+    /// <para>获取步骤状态指示器的背景画刷。</para>
+    /// Gets the background brush for the step status indicator.
+    /// </summary>
+    public Avalonia.Media.IBrush StatusBrush =>
+        IsFailed ? Avalonia.Media.Brushes.IndianRed :
+        IsCompleted ? Avalonia.Media.Brushes.MediumSeaGreen :
+        IsActive ? Avalonia.Media.Brushes.OrangeRed :
+        Avalonia.Media.Brushes.Gray;
+
+    /// <summary>
+    /// <para>获取步骤文本的前景画刷。</para>
+    /// Gets the foreground brush for the step text.
+    /// </summary>
+    public Avalonia.Media.IBrush StatusForeground =>
+        IsFailed ? Avalonia.Media.Brushes.IndianRed :
+        IsCompleted ? Avalonia.Media.Brushes.MediumSeaGreen :
+        IsActive ? Avalonia.Media.Brushes.OrangeRed :
+        Avalonia.Media.Brushes.Gray;
 }

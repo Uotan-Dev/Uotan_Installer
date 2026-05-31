@@ -8,19 +8,20 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <PublishAot>true</PublishAot>
 
-    <InvariantGlobalization>true</InvariantGlobalization>
     <IlcOptimizationPreference>Size</IlcOptimizationPreference>
     <EventSourceSupport>false</EventSourceSupport>
     <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
     <PublishReadyToRun>false</PublishReadyToRun>
     <StripSymbols>true</StripSymbols>
     <CETCompat>false</CETCompat>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
   </PropertyGroup>
 
   <ItemGroup>
     <Folder Include="Models\" />
     <AvaloniaResource Include="Assets\**" />
     <AvaloniaResource Include="Resources\i18n\*.axaml" />
+    <EmbeddedResource Include="Resources\i18n\*.axaml" LogicalName="Resources.i18n.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

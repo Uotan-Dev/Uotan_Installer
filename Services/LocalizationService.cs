@@ -1,6 +1,5 @@
-using Avalonia.Platform;
 using System.Globalization;
-using System.Xml;
+using System.Xml.Linq;
 
 namespace UotanInstaller.App.Services;
 
@@ -10,8 +9,6 @@ namespace UotanInstaller.App.Services;
 /// </summary>
 public sealed class LocalizationService : ILocalizationService
 {
-    private const string XamlNamespace = "http://schemas.microsoft.com/winfx/2006/xaml";
-
     private readonly Dictionary<string, string> _strings = new();
     private string _currentLanguage = "chs";
 
@@ -32,14 +29,21 @@ public sealed class LocalizationService : ILocalizationService
 
     private static string GetSystemLanguage()
     {
-        var culture = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.ToLowerInvariant();
-        return culture switch
+        try
         {
-            "zh" => "chs",
-            "ja" => "ja",
-            "en" => "en",
-            _ => "chs"
-        };
+            var culture = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.ToLowerInvariant();
+            return culture switch
+            {
+                "zh" => "chs",
+                "ja" => "ja",
+                "en" => "en",
+                _ => "chs"
+            };
+        }
+        catch
+        {
+            return "chs";
+        }
     }
 
     /// <inheritdoc/>
@@ -50,25 +54,41 @@ public sealed class LocalizationService : ILocalizationService
 
         try
         {
-            var uri = new Uri($"avares://UotanInstaller.App/Resources/i18n/{language}.axaml");
-            using var stream = AssetLoader.Open(uri);
-            using var reader = XmlReader.Create(stream);
+            var assembly = typeof(LocalizationService).Assembly;
+            var resourceName = $"Resources.i18n.{language}.axaml";
 
-            while (reader.Read())
+            using var stream = assembly.GetManifestResourceStream(resourceName);
+            if (stream is null)
             {
-                if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "String")
+                var available = string.Join(", ", assembly.GetManifestResourceNames());
+                System.Diagnostics.Debug.WriteLine(
+                    $"本地化资源未找到: {resourceName}, 可用资源: {available}");
+                return;
+            }
+
+            var doc = XDocument.Load(stream);
+            XNamespace xns = "http://schemas.microsoft.com/winfx/2006/xaml";
+
+            foreach (var element in doc.Descendants())
+            {
+                if (element.Name.LocalName == "String")
                 {
-                    var key = reader.GetAttribute("Key", XamlNamespace);
-                    if (key is not null)
+                    var keyAttr = element.Attribute(xns + "Key");
+                    if (keyAttr != null)
                     {
-                        var value = reader.ReadElementContentAsString();
-                        _strings[key] = value;
+                        var key = keyAttr.Value;
+                        var value = element.Value;
+                        if (!string.IsNullOrEmpty(key))
+                        {
+                            _strings[key] = value;
+                        }
                     }
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"加载本地化资源失败: {ex.Message}");
         }
 
         LanguageChanged?.Invoke(language);

@@ -63,4 +63,8 @@
   <s:String x:Key="DiskSpaceInsufficient">Insufficient disk space</s:String>
   <s:String x:Key="SystemVersionInsufficient">System version does not meet requirements</s:String>
   <s:String x:Key="PlatformCheckFailed">Platform check failed</s:String>
+  <s:String x:Key="Notice">Notice</s:String>
+  <s:String x:Key="RetryLimitReached">Multiple retries failed. Please check your network connection or contact support.</s:String>
+  <s:String x:Key="SelfUpdateConfirm">A new version is available. Would you like to update now?</s:String>
+  <s:String x:Key="SelectInstallPath">Select Install Path</s:String>
 </ResourceDictionary>

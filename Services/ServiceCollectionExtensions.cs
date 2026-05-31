@@ -32,7 +32,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IFileService, FileService>();
         services.AddSingleton<IDownloadService, DownloadService>();
         services.AddSingleton<IDialogService>(sp =>
-            new DialogService(() => sp.GetRequiredService<WindowProvider>().Window));
+            new DialogService(() => sp.GetRequiredService<WindowProvider>().Window, sp.GetRequiredService<ILocalizationService>()));
         services.AddSingleton<IPlatformDetector, PlatformDetector>();
         services.AddSingleton<IPlatformAdapter>(sp =>
             PlatformAdapterFactory.Create(sp.GetRequiredService<IPlatformDetector>()));

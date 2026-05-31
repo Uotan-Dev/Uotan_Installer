@@ -8,7 +8,7 @@
         x:Class="UotanInstaller.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="avares://UotanInstaller.App/Assets/uotan.ico"
-        Title="柚坛工具箱部署器"
+        Title="{Binding AppTitle}"
         Width="700" Height="400"
         WindowStartupLocation="CenterScreen"
         CanResize="False"
@@ -52,17 +52,17 @@
         <!-- Step 1: Eula -->
         <StackPanel IsVisible="{Binding IsEulaStep}"
                     VerticalAlignment="Center">
-          <TextBlock Text="用户协议"
+          <TextBlock Text="{Binding EulaTitle}"
                      Classes="step-title" />
-          <TextBlock Text="请阅读并同意最终用户许可协议后继续安装。"
+          <TextBlock Text="{Binding EulaDesc}"
                      Classes="step-desc" />
 
           <CheckBox Classes="check"
                     IsChecked="{Binding IsCreateShortcut}"
-                    Content="创建桌面快捷方式"
+                    Content="{Binding CreateShortcutText}"
                     Margin="0,8,0,4" />
 
-          <TextBlock Text="安装路径"
+          <TextBlock Text="{Binding InstallPathText}"
                      Classes="form-label"
                      Margin="0,12,0,4" />
           <Grid ColumnDefinitions="*,Auto">
@@ -73,7 +73,7 @@
                      FontSize="12" />
             <Button Grid.Column="1"
                     Classes="secondary"
-                    Content="浏览"
+                    Content="{Binding BrowseText}"
                     Command="{Binding BrowseInstallPathCommand}"
                     Margin="8,0,0,0"
                     Padding="12,8" />
@@ -81,12 +81,12 @@
 
           <CheckBox Classes="check"
                     IsChecked="{Binding IsAgreeEula}"
-                    Content="我已阅读并同意最终用户许可协议"
+                    Content="{Binding AgreeEulaText}"
                     Margin="0,4,0,8" />
 
           <StackPanel Classes="button-row">
             <Button Classes="accent"
-                    Content="开始"
+                    Content="{Binding StartText}"
                     Command="{Binding StartCommand}" />
           </StackPanel>
         </StackPanel>
@@ -98,12 +98,13 @@
           <StackPanel Grid.Row="0">
             <TextBlock Classes="step-title">
               <TextBlock.Text>
-                <MultiBinding StringFormat="{}选择镜像源 - v{0}">
+                <MultiBinding StringFormat="{}{0} - v{1}">
+                  <Binding Path="ChooseMirrorTitleText" />
                   <Binding Path="PatchVersion" />
                 </MultiBinding>
               </TextBlock.Text>
             </TextBlock>
-            <TextBlock Text="请选择一个下载镜像源，推荐选择速度最快的镜像。"
+            <TextBlock Text="{Binding ChooseMirrorDescText}"
                        Classes="step-desc" />
           </StackPanel>
 
@@ -148,7 +149,7 @@
 
           <StackPanel Grid.Row="3" Classes="button-row">
             <Button Classes="secondary"
-                    Content="测速"
+                    Content="{Binding SpeedTestText}"
                     Command="{Binding SpeedTestCommand}"
                     IsVisible="{Binding !IsSpeedTesting}" />
             <ProgressBar Classes="install"
@@ -164,7 +165,7 @@
         <!-- Step 3: Installing -->
         <StackPanel IsVisible="{Binding IsInstallingStep}"
                     VerticalAlignment="Center">
-          <TextBlock Text="正在安装"
+          <TextBlock Text="{Binding InstallingText}"
                      Classes="step-title" />
 
           <ItemsControl ItemsSource="{Binding InstallSubSteps}"
@@ -176,12 +177,18 @@
                   <Border Width="18" Height="18"
                           CornerRadius="9"
                           Margin="0,0,6,0"
-                          Background="{DynamicResource SurfaceVariantBrush}" />
+                          Background="{Binding StatusBrush}">
+                    <TextBlock Text="{Binding StatusIcon}"
+                               FontSize="9"
+                               Foreground="White"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                  </Border>
                   <TextBlock Grid.Column="1"
                              Text="{Binding DisplayName}"
                              VerticalAlignment="Center"
                              FontSize="14"
-                             Foreground="{DynamicResource TextSecondaryBrush}" />
+                             Foreground="{Binding StatusForeground}" />
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -211,7 +218,7 @@
                       HorizontalAlignment="Center"
                       Margin="0,8,0,0">
             <Button Classes="secondary"
-                    Content="重试"
+                    Content="{Binding RetryText}"
                     Command="{Binding RetryCommand}"
                     Padding="16,8" />
           </StackPanel>
@@ -225,28 +232,28 @@
                   CornerRadius="32"
                   Background="{DynamicResource SuccessBrush}"
                   Margin="0,0,0,16">
-            <TextBlock Text="✔"
+            <TextBlock Text="✓"
                        FontSize="28"
                        Foreground="White"
                        HorizontalAlignment="Center"
                        VerticalAlignment="Center" />
           </Border>
 
-          <TextBlock Text="安装完成"
+          <TextBlock Text="{Binding InstallCompleteText}"
                      Classes="step-title"
                      HorizontalAlignment="Center" />
 
-          <TextBlock Text="UotanToolbox 已成功安装到您的设备上。"
+          <TextBlock Text="{Binding InstallCompleteDescText}"
                      Classes="step-desc"
                      HorizontalAlignment="Center" />
 
           <StackPanel Classes="button-row"
                       HorizontalAlignment="Center">
             <Button Classes="secondary"
-                    Content="打开安装目录"
+                    Content="{Binding OpenInstallDirText}"
                     Command="{Binding OpenInstallDirectoryCommand}" />
             <Button Classes="accent"
-                    Content="启动柚坛工具箱"
+                    Content="{Binding LaunchAppText}"
                     Command="{Binding LaunchAppCommand}" />
           </StackPanel>
         </StackPanel>
@@ -259,7 +266,7 @@
                   CornerRadius="32"
                   Background="{DynamicResource BrandBrush}"
                   Margin="0,0,0,16">
-            <TextBlock Text="ℹ"
+            <TextBlock Text="✓"
                        FontSize="28"
                        Foreground="White"
                        HorizontalAlignment="Center"
@@ -269,23 +276,24 @@
           <TextBlock Classes="step-title"
                      HorizontalAlignment="Center">
             <TextBlock.Text>
-              <MultiBinding StringFormat="{}已安装 - v{0}">
+              <MultiBinding StringFormat="{}{0} - v{1}">
+                <Binding Path="AlreadyInstalledText" />
                 <Binding Path="InstalledVersion" />
               </MultiBinding>
             </TextBlock.Text>
           </TextBlock>
 
-          <TextBlock Text="UotanToolbox 已安装在您的设备上。"
+          <TextBlock Text="{Binding AlreadyInstalledDescText}"
                      Classes="step-desc"
                      HorizontalAlignment="Center" />
 
           <StackPanel Classes="button-row"
                       HorizontalAlignment="Center">
             <Button Classes="secondary"
-                    Content="重新安装"
+                    Content="{Binding ReinstallText}"
                     Command="{Binding ReinstallCommand}" />
             <Button Classes="accent"
-                    Content="启动柚坛工具箱"
+                    Content="{Binding LaunchAppText}"
                     Command="{Binding LaunchAppCommand}" />
           </StackPanel>
         </StackPanel>
