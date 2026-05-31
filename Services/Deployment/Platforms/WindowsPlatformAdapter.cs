@@ -31,8 +31,8 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
     }
 
     /// <summary>
-    /// <para>在 Windows 桌面创建应用程序快捷方式（.lnk 文件）。</para>
-    /// Creates an application shortcut (.lnk file) on the Windows desktop.
+    /// <para>在 Windows 桌面创建应用程序快捷方式（.lnk 文件），直接写入 Shell Link 二进制格式，无需 COM 互操作。</para>
+    /// Creates an application shortcut (.lnk file) on the Windows desktop by writing the Shell Link binary format directly, without COM interop.
     /// </summary>
     /// <param name="appName">
     /// <para>应用程序名称，用作快捷方式文件名。</para>
@@ -60,171 +60,199 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
         {
             ct.ThrowIfCancellationRequested();
 
-            try
-            {
-                var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-                var lnkPath = Path.Combine(desktopPath, $"{appName}.lnk");
+            var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            var lnkPath = Path.Combine(desktopPath, $"{appName}.lnk");
 
-                if (!Directory.Exists(desktopPath))
-                {
-                    Directory.CreateDirectory(desktopPath);
-                }
-
-                // 尝试使用简单的VBScript方式创建快捷方式
-                CreateShortcutWithVBS(lnkPath, targetPath, args ?? string.Empty, Path.GetDirectoryName(targetPath) ?? string.Empty);
-            }
-            catch
-            {
-                // 如果失败，忽略错误，不阻塞安装
-            }
+            WriteShortcutBinary(lnkPath, targetPath, args ?? string.Empty, Path.GetDirectoryName(targetPath) ?? string.Empty);
         }, ct);
     }
 
     /// <summary>
-    /// 使用VBScript创建快捷方式
+    /// <para>直接写入 Shell Link (.lnk) 二进制文件格式，使用 ILCreateFromPathW P/Invoke 获取 PIDL，完全避免 COM 互操作。</para>
+    /// Writes the Shell Link (.lnk) binary file format directly, using ILCreateFromPathW P/Invoke to obtain the PIDL, completely avoiding COM interop.
     /// </summary>
-    private static void CreateShortcutWithVBS(string shortcutPath, string targetPath, string arguments, string workingDirectory)
+    /// <param name="shortcutPath">
+    /// <para>快捷方式文件的完整路径。</para>
+    /// The full path of the shortcut file.
+    /// </param>
+    /// <param name="targetPath">
+    /// <para>目标可执行文件路径。</para>
+    /// The target executable file path.
+    /// </param>
+    /// <param name="arguments">
+    /// <para>命令行参数。</para>
+    /// The command-line arguments.
+    /// </param>
+    /// <param name="workingDirectory">
+    /// <para>工作目录。</para>
+    /// The working directory.
+    /// </param>
+    private static void WriteShortcutBinary(string shortcutPath, string targetPath, string arguments, string workingDirectory)
     {
+        var pidl = ILCreateFromPathW(targetPath);
+
+        if (pidl == IntPtr.Zero)
+        {
+            WriteShortcutWithExpString(shortcutPath, targetPath, arguments, workingDirectory);
+            return;
+        }
+
         try
         {
-            // 创建临时VBScript文件
-            var vbsContent = $@"
-Set WshShell = CreateObject(""WScript.Shell"")
-Set shortcut = WshShell.CreateShortcut(""{shortcutPath.Replace("\"", "\"\"")}"")
-shortcut.TargetPath = ""{targetPath.Replace("\"", "\"\"")}""
-shortcut.Arguments = ""{arguments.Replace("\"", "\"\"")}""
-shortcut.WorkingDirectory = ""{workingDirectory.Replace("\"", "\"\"")}""
-shortcut.Save
-";
+            uint linkFlags = LinkFlags.HasLinkTargetIDList
+                           | LinkFlags.IsUnicode
+                           | LinkFlags.HasWorkingDir;
 
-            var tempVbsPath = Path.Combine(Path.GetTempPath(), $"create_shortcut.vbs");
-            File.WriteAllText(tempVbsPath, vbsContent, Encoding.UTF8);
+            if (!string.IsNullOrEmpty(arguments))
+                linkFlags |= LinkFlags.HasArguments;
 
-            try
-            {
-                // 执行VBScript
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "wscript.exe",
-                    Arguments = $"//Nologo //B \"{tempVbsPath}\"",
-                    UseShellExecute = true,
-                    CreateNoWindow = true,
-                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
-                };
+            using var stream = new FileStream(shortcutPath, FileMode.Create, FileAccess.Write);
+            using var writer = new BinaryWriter(stream);
 
-                var process = System.Diagnostics.Process.Start(psi);
-                if (process != null)
-                {
-                    process.WaitForExit(5000);
-                }
-            }
-            finally
-            {
-                try
-                {
-                    if (File.Exists(tempVbsPath))
-                    {
-                        File.Delete(tempVbsPath);
-                    }
-                }
-                catch
-                {
-                    // 忽略删除错误
-                }
-            }
+            WriteShellLinkHeader(writer, linkFlags);
+            WriteLinkTargetIdList(writer, pidl);
+
+            WriteUnicodeStringData(writer, workingDirectory);
+            if (!string.IsNullOrEmpty(arguments))
+                WriteUnicodeStringData(writer, arguments);
+
+            writer.Write(0u);
         }
-        catch
+        finally
         {
-            // VBScript方式也失败了，尝试使用另一种方法
-            CreateShortcutWithPowerShell(shortcutPath, targetPath, arguments, workingDirectory);
+            ILFree(pidl);
         }
     }
 
     /// <summary>
-    /// 使用PowerShell创建快捷方式
+    /// <para>当 ILCreateFromPathW 失败时，使用 EnvironmentVariableDataBlock 写入 .lnk 文件作为降级方案。</para>
+    /// When ILCreateFromPathW fails, writes a .lnk file using the EnvironmentVariableDataBlock as a fallback.
     /// </summary>
-    private static void CreateShortcutWithPowerShell(string shortcutPath, string targetPath, string arguments, string workingDirectory)
+    private static void WriteShortcutWithExpString(string shortcutPath, string targetPath, string arguments, string workingDirectory)
     {
-        try
-        {
-            var psScript = $@"
-$wshell = New-Object -ComObject WScript.Shell;
-$shortcut = $wshell.CreateShortcut('{shortcutPath.Replace("'", "''")}');
-$shortcut.TargetPath = '{targetPath.Replace("'", "''")}';
-$shortcut.Arguments = '{arguments.Replace("'", "''")}';
-$shortcut.WorkingDirectory = '{workingDirectory.Replace("'", "''")}';
-$shortcut.Save();
-";
+        uint linkFlags = LinkFlags.IsUnicode
+                       | LinkFlags.HasWorkingDir
+                       | LinkFlags.HasExpString;
 
-            var tempPs1Path = Path.Combine(Path.GetTempPath(), $"create_shortcut.ps1");
-            File.WriteAllText(tempPs1Path, psScript, Encoding.UTF8);
+        if (!string.IsNullOrEmpty(arguments))
+            linkFlags |= LinkFlags.HasArguments;
 
-            try
-            {
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "powershell.exe",
-                    Arguments = $"-ExecutionPolicy Bypass -NoProfile -File \"{tempPs1Path}\"",
-                    UseShellExecute = true,
-                    CreateNoWindow = true,
-                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
-                };
+        using var stream = new FileStream(shortcutPath, FileMode.Create, FileAccess.Write);
+        using var writer = new BinaryWriter(stream);
 
-                var process = System.Diagnostics.Process.Start(psi);
-                if (process != null)
-                {
-                    process.WaitForExit(5000);
-                }
-            }
-            finally
-            {
-                try
-                {
-                    if (File.Exists(tempPs1Path))
-                    {
-                        File.Delete(tempPs1Path);
-                    }
-                }
-                catch
-                {
-                }
-            }
-        }
-        catch
-        {
-            // 所有方法都失败了，我们干脆不创建快捷方式
-        }
+        WriteShellLinkHeader(writer, linkFlags);
+
+        WriteUnicodeStringData(writer, workingDirectory);
+        if (!string.IsNullOrEmpty(arguments))
+            WriteUnicodeStringData(writer, arguments);
+
+        WriteEnvironmentVariableBlock(writer, targetPath);
+
+        writer.Write(0u);
     }
 
     /// <summary>
-    /// <para>使用 ShellExecuteExW 以 \"open\" 动词启动指定的应用程序。</para>
-    /// Launches the specified application using ShellExecuteExW with the "open" verb.
+    /// <para>写入 ShellLinkHeader 结构（76 字节）。</para>
+    /// Writes the ShellLinkHeader structure (76 bytes).
     /// </summary>
-    /// <param name="exePath">
-    /// <para>可执行文件的路径。</para>
-    /// The executable file path.
-    /// </param>
-    /// <param name="args">
-    /// <para>启动时传递的命令行参数，可为 null。</para>
-    /// The command-line arguments passed at launch, or null.
-    /// </param>
+    private static void WriteShellLinkHeader(BinaryWriter writer, uint linkFlags)
+    {
+        writer.Write(0x4Cu);
+        writer.Write(ShellLinkCLSID.ToByteArrayLe());
+        writer.Write(linkFlags);
+        writer.Write(0x20u);
+        writer.Write(0L);
+        writer.Write(0L);
+        writer.Write(0L);
+        writer.Write(0u);
+        writer.Write(0);
+        writer.Write(1);
+        writer.Write((ushort)0);
+        writer.Write((ushort)0);
+        writer.Write(0u);
+        writer.Write(0u);
+    }
+
+    /// <summary>
+    /// <para>写入 LinkTargetIDList 结构，包含从 ILCreateFromPathW 获取的 PIDL。</para>
+    /// Writes the LinkTargetIDList structure containing the PIDL obtained from ILCreateFromPathW.
+    /// </summary>
+    private static void WriteLinkTargetIdList(BinaryWriter writer, IntPtr pidl)
+    {
+        int idListDataSize = 0;
+        var current = pidl;
+        while (true)
+        {
+            var cb = Marshal.ReadInt16(current);
+            if (cb == 0) break;
+            idListDataSize += cb;
+            current = IntPtr.Add(current, cb);
+        }
+
+        var idListSize = (ushort)(idListDataSize + 2);
+        writer.Write(idListSize);
+
+        current = pidl;
+        while (true)
+        {
+            var cb = Marshal.ReadInt16(current);
+            if (cb == 0) break;
+            var bytes = new byte[cb];
+            Marshal.Copy(current, bytes, 0, cb);
+            writer.Write(bytes);
+            current = IntPtr.Add(current, cb);
+        }
+
+        writer.Write((ushort)0);
+    }
+
+    /// <summary>
+    /// <para>写入 Unicode 字符串数据段（字符计数 + UTF-16LE 编码字符串 + 空终止符）。</para>
+    /// Writes a Unicode string data section (character count + UTF-16LE encoded string + null terminator).
+    /// </summary>
+    private static void WriteUnicodeStringData(BinaryWriter writer, string value)
+    {
+        var charCount = (ushort)(value.Length + 1);
+        writer.Write(charCount);
+        writer.Write(Encoding.Unicode.GetBytes(value));
+        writer.Write((ushort)0);
+    }
+
+    /// <summary>
+    /// <para>写入 EnvironmentVariableDataBlock（签名 0xA0000001），包含目标路径的 ANSI 和 Unicode 表示。</para>
+    /// Writes the EnvironmentVariableDataBlock (signature 0xA0000001) containing the target path in both ANSI and Unicode representations.
+    /// </summary>
+    private static void WriteEnvironmentVariableBlock(BinaryWriter writer, string targetPath)
+    {
+        var ansiBuffer = new byte[260];
+        var unicodeBuffer = new byte[520];
+
+        var ansiBytes = Encoding.Default.GetBytes(targetPath);
+        Array.Copy(ansiBytes, 0, ansiBuffer, 0, Math.Min(ansiBytes.Length, 259));
+
+        var unicodeBytes = Encoding.Unicode.GetBytes(targetPath);
+        Array.Copy(unicodeBytes, 0, unicodeBuffer, 0, Math.Min(unicodeBytes.Length, 518));
+
+        uint blockSize = 4 + 4 + 260 + 520;
+        writer.Write(blockSize);
+        writer.Write(0xA0000001u);
+        writer.Write(ansiBuffer);
+        writer.Write(unicodeBuffer);
+    }
+
+    /// <summary>
+    /// <para>使用 ShellExecuteExW 以指定动词启动程序。</para>
+    /// Launches a program using ShellExecuteExW with the specified verb.
+    /// </summary>
     public void LaunchApplication(string exePath, string? args = null)
     {
         ShellExecute(exePath, args, "open");
     }
 
     /// <summary>
-    /// <para>使用 ShellExecuteExW 以 \"runas\" 动词请求管理员权限启动指定程序。</para>
+    /// <para>使用 ShellExecuteExW 以 "runas" 动词请求管理员权限启动指定程序。</para>
     /// Requests administrator privileges to launch the specified program using ShellExecuteExW with the "runas" verb.
     /// </summary>
-    /// <param name="exePath">
-    /// <para>可执行文件的路径。</para>
-    /// The executable file path.
-    /// </param>
-    /// <param name="args">
-    /// <para>启动时传递的命令行参数，可为 null。</para>
-    /// The command-line arguments passed at launch, or null.
-    /// </param>
     public void RequestElevation(string exePath, string? args = null)
     {
         ShellExecute(exePath, args, "runas");
@@ -234,10 +262,6 @@ $shortcut.Save();
     /// <para>获取 Windows 平台的临时文件目录路径。</para>
     /// Gets the temporary file directory path on Windows.
     /// </summary>
-    /// <returns>
-    /// <para>临时文件目录的绝对路径。</para>
-    /// The absolute path of the temporary file directory.
-    /// </returns>
     public string GetTempDirectory() => Path.GetTempPath();
 
     public Task<string?> FindExecutableAsync(string installPath)
@@ -272,7 +296,6 @@ $shortcut.Save();
     {
         try
         {
-            // 首先尝试使用 Process.Start 直接启动
             var psi = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = programPath,
@@ -285,7 +308,6 @@ $shortcut.Save();
         }
         catch
         {
-            // 如果直接启动失败，尝试使用 ShellExecuteEx
         }
 
         var sei = new SHELLEXECUTEINFOW
@@ -301,7 +323,6 @@ $shortcut.Save();
 
         if (!ShellExecuteExW(ref sei))
         {
-            // 如果 ShellExecuteEx 也失败，尝试更简单的启动方式
             try
             {
                 var psi = new System.Diagnostics.ProcessStartInfo
@@ -325,6 +346,25 @@ $shortcut.Save();
             CloseHandle(sei.hProcess);
         }
     }
+
+    private static readonly Guid ShellLinkCLSID = new("00021401-0000-0000-C000-000000000046");
+
+    private static class LinkFlags
+    {
+        public const uint HasLinkTargetIDList = 0x00000001;
+        public const uint HasWorkingDir = 0x00000010;
+        public const uint HasArguments = 0x00000020;
+        public const uint IsUnicode = 0x00000080;
+        public const uint HasExpString = 0x00000200;
+    }
+
+    #region P/Invoke
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr ILCreateFromPathW(string pszPath);
+
+    [DllImport("shell32.dll")]
+    private static extern void ILFree(IntPtr pidl);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct SHELLEXECUTEINFOW
@@ -361,4 +401,15 @@ $shortcut.Save();
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool CloseHandle(IntPtr hObject);
+
+    #endregion
+}
+
+file static class GuidExtensions
+{
+    public static byte[] ToByteArrayLe(this Guid guid)
+    {
+        var bytes = guid.ToByteArray();
+        return bytes;
+    }
 }
