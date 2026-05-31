@@ -92,12 +92,50 @@ public sealed class LinuxPlatformAdapter : IPlatformAdapter
             using var chmodProcess = Process.Start(chmodPsi)
                 ?? throw new DeploymentException($"Failed to set executable permission on '{desktopFilePath}'.");
             chmodProcess.WaitForExit();
+
+            var applicationsDir = Path.Combine(homeDir, ".local", "share", "applications");
+            if (!Directory.Exists(applicationsDir))
+            {
+                Directory.CreateDirectory(applicationsDir);
+            }
+
+            var appDesktopFilePath = Path.Combine(applicationsDir, $"{appName}.desktop");
+            try
+            {
+                File.WriteAllText(appDesktopFilePath, content.ToString());
+                var chmodAppPsi = new ProcessStartInfo
+                {
+                    FileName = "chmod",
+                    Arguments = $"+x \"{appDesktopFilePath}\"",
+                    UseShellExecute = false,
+                };
+                using var chmodAppProcess = Process.Start(chmodAppPsi);
+                chmodAppProcess?.WaitForExit();
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                var updateDbPsi = new ProcessStartInfo
+                {
+                    FileName = "update-desktop-database",
+                    Arguments = applicationsDir,
+                    UseShellExecute = false,
+                };
+                using var updateDbProcess = Process.Start(updateDbPsi);
+                updateDbProcess?.WaitForExit();
+            }
+            catch
+            {
+            }
         }, ct);
     }
 
     /// <summary>
-    /// <para>启动指定的应用程序，优先尝试 xdg-open，失败时回退到直接启动。</para>
-    /// Launches the specified application, preferring xdg-open first, falling back to direct launch on failure.
+    /// <para>启动指定的应用程序，先确保可执行权限后直接启动。</para>
+    /// Launches the specified application, ensuring execute permission before direct launch.
     /// </summary>
     /// <param name="exePath">
     /// <para>可执行文件的路径。</para>
@@ -107,36 +145,42 @@ public sealed class LinuxPlatformAdapter : IPlatformAdapter
     /// <para>启动时传递的命令行参数，可为 null。</para>
     /// The command-line arguments passed at launch, or null.
     /// </param>
+    /// <exception cref="DeploymentException">
+    /// <para>当指定的可执行文件不存在时抛出。</para>
+    /// Thrown when the specified executable file does not exist.
+    /// </exception>
     public void LaunchApplication(string exePath, string? args = null)
     {
+        if (!File.Exists(exePath))
+            throw new DeploymentException($"Executable not found: {exePath}");
+
         try
         {
-            var xdgArgs = string.IsNullOrEmpty(args) ? $"\"{exePath}\"" : $"\"{exePath}\" {args}";
-            var psi = new ProcessStartInfo
+            var chmodPsi = new ProcessStartInfo
             {
-                FileName = "xdg-open",
-                Arguments = xdgArgs,
+                FileName = "chmod",
+                Arguments = $"+x \"{exePath}\"",
                 UseShellExecute = false,
             };
-            Process.Start(psi)?.Dispose();
-            return;
+            using var chmodProcess = Process.Start(chmodPsi);
+            chmodProcess?.WaitForExit();
         }
         catch
         {
         }
 
-        var fallbackPsi = new ProcessStartInfo
+        var psi = new ProcessStartInfo
         {
             FileName = exePath,
             Arguments = args ?? string.Empty,
             UseShellExecute = false,
         };
-        Process.Start(fallbackPsi)?.Dispose();
+        Process.Start(psi)?.Dispose();
     }
 
     /// <summary>
-    /// <para>使用 pkexec 以管理员权限启动指定程序，将弹出 Linux 授权对话框。</para>
-    /// Launches the specified program with administrator privileges using pkexec, which will display a Linux authorization dialog.
+    /// <para>使用 pkexec 以管理员权限启动指定程序，将弹出 Linux 授权对话框。若 pkexec 不可用则抛出异常。</para>
+    /// Launches the specified program with administrator privileges using pkexec, which will display a Linux authorization dialog. Throws if pkexec is not available.
     /// </summary>
     /// <param name="exePath">
     /// <para>可执行文件的路径。</para>
@@ -146,8 +190,20 @@ public sealed class LinuxPlatformAdapter : IPlatformAdapter
     /// <para>启动时传递的命令行参数，可为 null。</para>
     /// The command-line arguments passed at launch, or null.
     /// </param>
+    /// <exception cref="PlatformNotSupportedDeploymentException">
+    /// <para>当系统中未安装 pkexec 时抛出。</para>
+    /// Thrown when pkexec is not installed on the system.
+    /// </exception>
     public void RequestElevation(string exePath, string? args = null)
     {
+        var pkexecPath = FindExecutableOnPath("pkexec");
+        if (pkexecPath is null)
+        {
+            throw new PlatformNotSupportedDeploymentException(
+                "pkexec is not available. Please install polkit or pkexec to enable privilege elevation.",
+                PlatformOS.Linux);
+        }
+
         var arguments = string.IsNullOrEmpty(args) ? $"\"{exePath}\"" : $"\"{exePath}\" {args}";
 
         var psi = new ProcessStartInfo
@@ -161,6 +217,42 @@ public sealed class LinuxPlatformAdapter : IPlatformAdapter
     }
 
     /// <summary>
+    /// <para>在系统 PATH 中查找指定可执行文件的完整路径。</para>
+    /// Searches the system PATH for the full path of the specified executable.
+    /// </summary>
+    /// <param name="name">
+    /// <para>要查找的可执行文件名称。</para>
+    /// The name of the executable to find.
+    /// </param>
+    /// <returns>
+    /// <para>可执行文件的完整路径；若未找到则返回 null。</para>
+    /// The full path of the executable; or null if not found.
+    /// </returns>
+    private static string? FindExecutableOnPath(string name)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "which",
+                Arguments = name,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+            };
+            using var process = Process.Start(psi);
+            if (process is null) return null;
+            process.WaitForExit();
+            if (process.ExitCode != 0) return null;
+            var result = process.StandardOutput.ReadLine();
+            return string.IsNullOrWhiteSpace(result) ? null : result.Trim();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// <para>获取 Linux 平台的临时文件目录路径。</para>
     /// Gets the temporary file directory path on Linux.
     /// </summary>
@@ -169,4 +261,73 @@ public sealed class LinuxPlatformAdapter : IPlatformAdapter
     /// The absolute path of the temporary file directory.
     /// </returns>
     public string GetTempDirectory() => Path.GetTempPath();
+
+    public Task<string?> FindExecutableAsync(string installPath)
+    {
+        return Task.Run(() =>
+        {
+            if (!Directory.Exists(installPath)) return null;
+
+            try
+            {
+                foreach (var file in Directory.GetFiles(installPath))
+                {
+                    var fileName = Path.GetFileName(file);
+                    if (fileName.Contains("UotanToolbox", StringComparison.OrdinalIgnoreCase) &&
+                        !fileName.Contains('.') &&
+                        IsExecutable(file))
+                    {
+                        return file;
+                    }
+                }
+
+                foreach (var file in Directory.GetFiles(installPath))
+                {
+                    if (!Path.GetFileName(file).Contains('.') && IsExecutable(file))
+                    {
+                        return file;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return null;
+        });
+    }
+
+    public Task OpenInFileExplorerAsync(string path)
+    {
+        return Task.Run(() =>
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "xdg-open",
+                Arguments = $"\"{path}\"",
+                UseShellExecute = false,
+            };
+            Process.Start(psi)?.Dispose();
+        });
+    }
+
+    private static bool IsExecutable(string filePath)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "test",
+                Arguments = $"-x \"{filePath}\"",
+                UseShellExecute = false,
+            };
+            using var process = Process.Start(psi);
+            process?.WaitForExit();
+            return process?.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 }

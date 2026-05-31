@@ -9,12 +9,13 @@ public sealed class VerifyStep : IDeploymentStep
     private readonly string _filePath;
     private readonly string _expectedSha256;
     private readonly IFileService _fileService;
+    private readonly ILocalizationService _localizationService;
 
     /// <summary>
     /// <para>获取步骤名称。</para>
     /// Gets the step name.
     /// </summary>
-    public string Name { get; } = "校验文件完整性";
+    public string Name { get; }
 
     /// <summary>
     /// <para>获取步骤类型。</para>
@@ -44,11 +45,17 @@ public sealed class VerifyStep : IDeploymentStep
     /// <para>文件服务实例。</para>
     /// The file service instance.
     /// </param>
-    public VerifyStep(string filePath, string expectedSha256, IFileService fileService)
+    /// <param name="localizationService">
+    /// <para>本地化服务实例。</para>
+    /// The localization service instance.
+    /// </param>
+    public VerifyStep(string filePath, string expectedSha256, IFileService fileService, ILocalizationService localizationService)
     {
         _filePath = filePath;
         _expectedSha256 = expectedSha256;
         _fileService = fileService;
+        _localizationService = localizationService;
+        Name = _localizationService["Step_Verify"];
     }
 
     /// <summary>
@@ -78,7 +85,7 @@ public sealed class VerifyStep : IDeploymentStep
             StepName = Name,
             Kind = Kind,
             ProgressValue = 0.0,
-            Message = "正在校验文件完整性...",
+            Message = _localizationService["Step_VerifyRunning"],
         });
 
         var actualHash = await _fileService.ComputeSha256Async(_filePath, ct).ConfigureAwait(false);
@@ -97,7 +104,7 @@ public sealed class VerifyStep : IDeploymentStep
             StepName = Name,
             Kind = Kind,
             ProgressValue = 1.0,
-            Message = "校验通过",
+            Message = _localizationService["Step_VerifyComplete"],
         });
 
         return new DeploymentStepResult

@@ -128,8 +128,8 @@ public interface IDeploymentRuleEngine
     IReadOnlyList<FileDeploymentRule> EvaluateFileRules(string filePath);
 
     /// <summary>
-    /// <para>异步检查当前平台是否满足所有给定的约束条件。</para>
-    /// Asynchronously checks whether the current platform satisfies all given constraints.
+    /// <para>异步检查当前平台是否满足所有给定的约束条件，包括操作系统、最低版本和最低磁盘空间要求。</para>
+    /// Asynchronously checks whether the current platform satisfies all given constraints, including OS, minimum version, and minimum disk space requirements.
     /// </summary>
     /// <param name="constraints">
     /// <para>要检查的平台约束条件集合。</para>
@@ -139,9 +139,13 @@ public interface IDeploymentRuleEngine
     /// <para>取消令牌。</para>
     /// Cancellation token.
     /// </param>
+    /// <param name="installPath">
+    /// <para>目标安装路径，用于确定检查磁盘空间的目标分区；为 null 时使用系统默认分区。</para>
+    /// The target installation path used to determine the partition for disk space checking; null uses the system default partition.
+    /// </param>
     /// <returns>
     /// <para>若满足所有约束返回 true，否则返回 false。</para>
     /// True if all constraints are satisfied; otherwise false.
     /// </returns>
-    Task<bool> CheckPlatformConstraintsAsync(IEnumerable<PlatformConstraint> constraints, CancellationToken ct);
+    Task<bool> CheckPlatformConstraintsAsync(IEnumerable<PlatformConstraint> constraints, CancellationToken ct, string? installPath = null);
 }

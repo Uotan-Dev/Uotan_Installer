@@ -9,13 +9,14 @@ public sealed class CreateShortcutStep : IDeploymentStep
     private readonly string _appName;
     private readonly string _targetPath;
     private readonly IPlatformAdapter _platformAdapter;
+    private readonly ILocalizationService _localizationService;
     private readonly string? _args;
 
     /// <summary>
     /// <para>获取步骤名称。</para>
     /// Gets the step name.
     /// </summary>
-    public string Name { get; } = "创建快捷方式";
+    public string Name { get; }
 
     /// <summary>
     /// <para>获取步骤类型。</para>
@@ -45,16 +46,22 @@ public sealed class CreateShortcutStep : IDeploymentStep
     /// <para>平台适配器实例。</para>
     /// The platform adapter instance.
     /// </param>
+    /// <param name="localizationService">
+    /// <para>本地化服务实例。</para>
+    /// The localization service instance.
+    /// </param>
     /// <param name="args">
     /// <para>启动目标程序时传递的命令行参数，可为 null。</para>
     /// The command-line arguments passed when launching the target program, or null.
     /// </param>
-    public CreateShortcutStep(string appName, string targetPath, IPlatformAdapter platformAdapter, string? args = null)
+    public CreateShortcutStep(string appName, string targetPath, IPlatformAdapter platformAdapter, ILocalizationService localizationService, string? args = null)
     {
         _appName = appName;
         _targetPath = targetPath;
         _platformAdapter = platformAdapter;
+        _localizationService = localizationService;
         _args = args;
+        Name = _localizationService["Step_CreateShortcut"];
     }
 
     /// <summary>
@@ -84,7 +91,7 @@ public sealed class CreateShortcutStep : IDeploymentStep
             StepName = Name,
             Kind = Kind,
             ProgressValue = 0.0,
-            Message = "正在创建快捷方式...",
+            Message = _localizationService["Step_ShortcutRunning"],
         });
 
         try
@@ -96,7 +103,7 @@ public sealed class CreateShortcutStep : IDeploymentStep
                 StepName = Name,
                 Kind = Kind,
                 ProgressValue = 1.0,
-                Message = "快捷方式创建成功",
+                Message = _localizationService["Step_ShortcutComplete"],
             });
 
             return new DeploymentStepResult

@@ -12,12 +12,13 @@ public sealed class ExtractStep : IDeploymentStep
     private readonly string _archivePath;
     private readonly string _targetDirectory;
     private readonly IReadOnlyList<FileDeploymentRule>? _fileRules;
+    private readonly ILocalizationService _localizationService;
 
     /// <summary>
     /// <para>获取步骤名称。</para>
     /// Gets the step name.
     /// </summary>
-    public string Name { get; } = "安装应用";
+    public string Name { get; }
 
     /// <summary>
     /// <para>获取步骤类型。</para>
@@ -43,15 +44,21 @@ public sealed class ExtractStep : IDeploymentStep
     /// <para>解压目标目录路径。</para>
     /// The target directory path for extraction.
     /// </param>
+    /// <param name="localizationService">
+    /// <para>本地化服务实例。</para>
+    /// The localization service instance.
+    /// </param>
     /// <param name="fileRules">
     /// <para>文件部署规则列表，可为 null。匹配规则的文件将被解压到指定的子目录中。</para>
     /// The list of file deployment rules, or null. Files matching a rule will be extracted to the specified subdirectory.
     /// </param>
-    public ExtractStep(string archivePath, string targetDirectory, IReadOnlyList<FileDeploymentRule>? fileRules = null)
+    public ExtractStep(string archivePath, string targetDirectory, ILocalizationService localizationService, IReadOnlyList<FileDeploymentRule>? fileRules = null)
     {
         _archivePath = archivePath;
         _targetDirectory = targetDirectory;
+        _localizationService = localizationService;
         _fileRules = fileRules;
+        Name = _localizationService["Step_Extract"];
     }
 
     /// <summary>
@@ -81,7 +88,7 @@ public sealed class ExtractStep : IDeploymentStep
             StepName = Name,
             Kind = Kind,
             ProgressValue = 0.0,
-            Message = "正在准备解压...",
+            Message = _localizationService["Step_ExtractPrepare"],
         });
 
         try
@@ -137,12 +144,13 @@ public sealed class ExtractStep : IDeploymentStep
                     {
                         lastReportTime = now;
                         var progressValue = (double)extractedCount / totalEntries;
+                        var extractRunningText = _localizationService["Step_ExtractRunning"];
                         progress?.Report(new DeploymentProgress
                         {
                             StepName = Name,
                             Kind = Kind,
                             ProgressValue = progressValue,
-                            Message = $"正在安装... ({extractedCount}/{totalEntries})",
+                            Message = $"{extractRunningText} ({extractedCount}/{totalEntries})",
                         });
                     }
                 }
@@ -153,7 +161,7 @@ public sealed class ExtractStep : IDeploymentStep
                 StepName = Name,
                 Kind = Kind,
                 ProgressValue = 1.0,
-                Message = "安装完成",
+                Message = _localizationService["Step_ExtractComplete"],
             });
 
             return new DeploymentStepResult

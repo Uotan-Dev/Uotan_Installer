@@ -8,13 +8,14 @@ public sealed class LaunchStep : IDeploymentStep
 {
     private readonly string _exePath;
     private readonly IPlatformAdapter _platformAdapter;
+    private readonly ILocalizationService _localizationService;
     private readonly string? _args;
 
     /// <summary>
     /// <para>获取步骤名称。</para>
     /// Gets the step name.
     /// </summary>
-    public string Name { get; } = "启动应用";
+    public string Name { get; }
 
     /// <summary>
     /// <para>获取步骤类型。</para>
@@ -40,15 +41,21 @@ public sealed class LaunchStep : IDeploymentStep
     /// <para>平台适配器实例。</para>
     /// The platform adapter instance.
     /// </param>
+    /// <param name="localizationService">
+    /// <para>本地化服务实例。</para>
+    /// The localization service instance.
+    /// </param>
     /// <param name="args">
     /// <para>启动时传递的命令行参数，可为 null。</para>
     /// The command-line arguments passed at launch, or null.
     /// </param>
-    public LaunchStep(string exePath, IPlatformAdapter platformAdapter, string? args = null)
+    public LaunchStep(string exePath, IPlatformAdapter platformAdapter, ILocalizationService localizationService, string? args = null)
     {
         _exePath = exePath;
         _platformAdapter = platformAdapter;
+        _localizationService = localizationService;
         _args = args;
+        Name = _localizationService["Step_Launch"];
     }
 
     /// <summary>
@@ -78,7 +85,7 @@ public sealed class LaunchStep : IDeploymentStep
             StepName = Name,
             Kind = Kind,
             ProgressValue = 0.0,
-            Message = "正在启动应用...",
+            Message = _localizationService["Step_LaunchRunning"],
         });
 
         try
@@ -90,7 +97,7 @@ public sealed class LaunchStep : IDeploymentStep
                 StepName = Name,
                 Kind = Kind,
                 ProgressValue = 1.0,
-                Message = "应用已启动",
+                Message = _localizationService["Step_LaunchComplete"],
             });
 
             return Task.FromResult(new DeploymentStepResult

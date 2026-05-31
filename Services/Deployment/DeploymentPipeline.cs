@@ -8,7 +8,21 @@ namespace UotanInstaller.App.Services.Deployment;
 /// </summary>
 public sealed class DeploymentPipeline : IDeploymentPipeline
 {
+    private readonly ILocalizationService _localizationService;
     private readonly List<IDeploymentStep> _steps = [];
+
+    /// <summary>
+    /// <para>使用本地化服务初始化 DeploymentPipeline 的新实例。</para>
+    /// Initializes a new instance of DeploymentPipeline with the localization service.
+    /// </summary>
+    /// <param name="localizationService">
+    /// <para>本地化服务实例。</para>
+    /// The localization service instance.
+    /// </param>
+    public DeploymentPipeline(ILocalizationService localizationService)
+    {
+        _localizationService = localizationService;
+    }
 
     /// <summary>
     /// <para>向管线中添加一个部署步骤。</para>
@@ -82,18 +96,19 @@ public sealed class DeploymentPipeline : IDeploymentPipeline
                     StepName = step.Name,
                     Kind = step.Kind,
                     ProgressValue = overallProgress,
-                    Message = "已跳过",
+                    Message = _localizationService["Step_Skipped"],
                 });
 
                 continue;
             }
 
+            var executingText = _localizationService["Step_Executing"];
             progress?.Report(new DeploymentProgress
             {
                 StepName = step.Name,
                 Kind = step.Kind,
                 ProgressValue = overallProgress,
-                Message = $"正在执行: {step.Name}",
+                Message = $"{executingText} {step.Name}",
             });
 
             DeploymentStepResult result;
@@ -118,6 +133,7 @@ public sealed class DeploymentPipeline : IDeploymentPipeline
             catch (OperationCanceledException)
             {
                 stopwatch.Stop();
+                var cancelledText = _localizationService["InstallCancelled"];
                 return new DeploymentResult
                 {
                     IsSuccess = false,
@@ -127,9 +143,9 @@ public sealed class DeploymentPipeline : IDeploymentPipeline
                         StepName = step.Name,
                         Kind = step.Kind,
                         IsSuccess = false,
-                        ErrorMessage = "操作已取消",
+                        ErrorMessage = cancelledText,
                     },
-                    ErrorMessage = "部署已取消",
+                    ErrorMessage = cancelledText,
                     Elapsed = stopwatch.Elapsed,
                 };
             }
@@ -156,12 +172,13 @@ public sealed class DeploymentPipeline : IDeploymentPipeline
 
             completedSteps.Add(result);
 
+            var completedText = _localizationService["Step_Completed"];
             progress?.Report(new DeploymentProgress
             {
                 StepName = step.Name,
                 Kind = step.Kind,
                 ProgressValue = (double)(i + 1) / _steps.Count,
-                Message = $"{step.Name} 完成",
+                Message = $"{step.Name} {completedText}",
             });
         }
 

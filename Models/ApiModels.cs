@@ -97,17 +97,17 @@ public enum InstallProgressKind
 }
 
 /// <summary>
-/// <para>Windows版本信息</para>
-/// Windows version information
+/// <para>语义化版本信息</para>
+/// Semantic version information
 /// </summary>
-public sealed class WindowsVersion : IComparable<WindowsVersion>, IEquatable<WindowsVersion>
+public sealed class SemanticVersion : IComparable<SemanticVersion>, IEquatable<SemanticVersion>
 {
     public ulong Major { get; }
     public ulong Minor { get; }
     public ulong Build { get; }
     public ulong Revision { get; }
 
-    public WindowsVersion(ulong major, ulong minor, ulong build, ulong revision)
+    public SemanticVersion(ulong major, ulong minor, ulong build, ulong revision)
     {
         Major = major;
         Minor = minor;
@@ -115,17 +115,18 @@ public sealed class WindowsVersion : IComparable<WindowsVersion>, IEquatable<Win
         Revision = revision;
     }
 
-    public static WindowsVersion Parse(string versionString)
+    public static SemanticVersion Parse(string versionString)
     {
+        if (versionString.Length > 0 && (versionString[0] == 'v' || versionString[0] == 'V')) versionString = versionString[1..];
         var parts = versionString.Split('.');
         var major = parts.Length > 0 && ulong.TryParse(parts[0], out var m) ? m : 0;
         var minor = parts.Length > 1 && ulong.TryParse(parts[1], out var mi) ? mi : 0;
         var build = parts.Length > 2 && ulong.TryParse(parts[2], out var b) ? b : 0;
         var revision = parts.Length > 3 && ulong.TryParse(parts[3], out var r) ? r : 0;
-        return new WindowsVersion(major, minor, build, revision);
+        return new SemanticVersion(major, minor, build, revision);
     }
 
-    public int CompareTo(WindowsVersion? other)
+    public int CompareTo(SemanticVersion? other)
     {
         if (other is null) return 1;
         int c = Major.CompareTo(other.Major);
@@ -137,20 +138,20 @@ public sealed class WindowsVersion : IComparable<WindowsVersion>, IEquatable<Win
         return Revision.CompareTo(other.Revision);
     }
 
-    public bool Equals(WindowsVersion? other)
+    public bool Equals(SemanticVersion? other)
     {
         if (other is null) return false;
         return Major == other.Major && Minor == other.Minor && Build == other.Build && Revision == other.Revision;
     }
 
-    public override bool Equals(object? obj) => Equals(obj as WindowsVersion);
+    public override bool Equals(object? obj) => Equals(obj as SemanticVersion);
 
     public override int GetHashCode() => HashCode.Combine(Major, Minor, Build, Revision);
 
-    public static bool operator <(WindowsVersion left, WindowsVersion right) => left.CompareTo(right) < 0;
-    public static bool operator >(WindowsVersion left, WindowsVersion right) => left.CompareTo(right) > 0;
-    public static bool operator <=(WindowsVersion left, WindowsVersion right) => left.CompareTo(right) <= 0;
-    public static bool operator >=(WindowsVersion left, WindowsVersion right) => left.CompareTo(right) >= 0;
+    public static bool operator <(SemanticVersion left, SemanticVersion right) => left.CompareTo(right) < 0;
+    public static bool operator >(SemanticVersion left, SemanticVersion right) => left.CompareTo(right) > 0;
+    public static bool operator <=(SemanticVersion left, SemanticVersion right) => left.CompareTo(right) <= 0;
+    public static bool operator >=(SemanticVersion left, SemanticVersion right) => left.CompareTo(right) >= 0;
 
     public override string ToString() => $"{Major}.{Minor}.{Build}.{Revision}";
 }

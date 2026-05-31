@@ -130,6 +130,34 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
     /// </returns>
     public string GetTempDirectory() => Path.GetTempPath();
 
+    public Task<string?> FindExecutableAsync(string installPath)
+    {
+        return Task.Run(() =>
+        {
+            if (!Directory.Exists(installPath)) return null;
+
+            var exeFiles = Directory.GetFiles(installPath, "UotanToolbox*.exe", SearchOption.TopDirectoryOnly);
+            if (exeFiles.Length > 0) return exeFiles[0];
+
+            var allExeFiles = Directory.GetFiles(installPath, "*.exe", SearchOption.TopDirectoryOnly);
+            return allExeFiles.Length > 0 ? allExeFiles[0] : null;
+        });
+    }
+
+    public Task OpenInFileExplorerAsync(string path)
+    {
+        return Task.Run(() =>
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"\"{path}\"",
+                UseShellExecute = false,
+            };
+            System.Diagnostics.Process.Start(psi)?.Dispose();
+        });
+    }
+
     private static void ShellExecute(string programPath, string? args, string verb)
     {
         var sei = new SHELLEXECUTEINFOW

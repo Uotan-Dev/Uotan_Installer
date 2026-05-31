@@ -28,8 +28,8 @@ public sealed class MacOSPlatformAdapter : IPlatformAdapter
     }
 
     /// <summary>
-    /// <para>在 macOS 桌面创建应用程序快捷方式（符号链接）。</para>
-    /// Creates an application shortcut (symbolic link) on the macOS desktop.
+    /// <para>在 macOS 桌面创建应用程序快捷方式（Finder 别名）。</para>
+    /// Creates an application shortcut (Finder alias) on the macOS desktop.
     /// </summary>
     /// <param name="appName">
     /// <para>应用程序名称，用作快捷方式名称。</para>
@@ -59,43 +59,47 @@ public sealed class MacOSPlatformAdapter : IPlatformAdapter
 
             var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             var desktopDir = Path.Combine(homeDir, "Desktop");
-            var linkPath = Path.Combine(desktopDir, $"{appName}.app");
+            var aliasPath = Path.Combine(desktopDir, $"{appName}");
 
             if (!Directory.Exists(desktopDir))
             {
                 Directory.CreateDirectory(desktopDir);
             }
 
-            if (File.Exists(linkPath) || Directory.Exists(linkPath))
+            if (File.Exists(aliasPath) || Directory.Exists(aliasPath))
             {
                 try
                 {
-                    if (Directory.Exists(linkPath))
-                        Directory.Delete(linkPath, recursive: true);
+                    if (Directory.Exists(aliasPath))
+                        Directory.Delete(aliasPath, recursive: true);
                     else
-                        File.Delete(linkPath);
+                        File.Delete(aliasPath);
                 }
                 catch
                 {
                 }
             }
 
+            var escapedTarget = targetPath.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            var escapedAlias = aliasPath.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            var script = $"tell application \"Finder\" to make alias file to (POSIX file \"{escapedTarget}\") at (POSIX file \"{Path.GetDirectoryName(aliasPath)}/\")";
+
             var psi = new ProcessStartInfo
             {
-                FileName = "ln",
-                Arguments = $"-s \"{targetPath}\" \"{linkPath}\"",
+                FileName = "osascript",
+                Arguments = $"-e '{script.Replace("'", "'\\''")}'",
                 UseShellExecute = false,
                 RedirectStandardError = true,
             };
 
             using var process = Process.Start(psi)
-                ?? throw new DeploymentException($"Failed to create symbolic link from '{targetPath}' to '{linkPath}'.");
+                ?? throw new DeploymentException($"Failed to create alias from '{targetPath}' to '{aliasPath}'.");
             process.WaitForExit();
 
             if (process.ExitCode != 0)
             {
                 var error = process.StandardError.ReadToEnd();
-                throw new DeploymentException($"Failed to create symbolic link: {error}");
+                throw new DeploymentException($"Failed to create alias: {error}");
             }
         }, ct);
     }
@@ -164,4 +168,49 @@ public sealed class MacOSPlatformAdapter : IPlatformAdapter
     /// The absolute path of the temporary file directory.
     /// </returns>
     public string GetTempDirectory() => Path.GetTempPath();
+
+    public Task<string?> FindExecutableAsync(string installPath)
+    {
+        return Task.Run(() =>
+        {
+            if (!Directory.Exists(installPath)) return null;
+
+            var macosDir = Path.Combine(installPath, "Contents", "MacOS");
+            if (Directory.Exists(macosDir))
+            {
+                var files = Directory.GetFiles(macosDir);
+                if (files.Length > 0) return files[0];
+            }
+
+            try
+            {
+                foreach (var file in Directory.GetFiles(installPath))
+                {
+                    if (!Path.GetFileName(file).Contains('.'))
+                    {
+                        return file;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return null;
+        });
+    }
+
+    public Task OpenInFileExplorerAsync(string path)
+    {
+        return Task.Run(() =>
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "open",
+                Arguments = $"\"{path}\"",
+                UseShellExecute = false,
+            };
+            Process.Start(psi)?.Dispose();
+        });
+    }
 }

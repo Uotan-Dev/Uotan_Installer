@@ -49,6 +49,10 @@ public interface IInstallerService
     /// <para>执行安装器自更新</para>
     /// Perform an installer self-update
     /// </summary>
+    /// <param name="downloadProgress">
+    /// <para>下载进度回调，报告已下载字节数和总字节数。</para>
+    /// Download progress callback reporting downloaded bytes and total bytes.
+    /// </param>
     /// <param name="cancellationToken">
     /// <para>取消令牌</para>
     /// Cancellation token
@@ -57,7 +61,7 @@ public interface IInstallerService
     /// <para>异步任务</para>
     /// An asynchronous task
     /// </returns>
-    Task SelfUpdateAsync(CancellationToken cancellationToken = default);
+    Task SelfUpdateAsync(IProgress<(long Downloaded, long Total)>? downloadProgress = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// <para>启动柚坛工具箱并退出安装器</para>

@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
+using System.Runtime.InteropServices;
 using UotanInstaller.App.Models;
 using UotanInstaller.App.Services;
 using UotanInstaller.App.Services.Deployment;
@@ -17,6 +18,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IReleaseApiService? _releaseApiService;
     private readonly IDownloadService? _downloadService;
     private readonly IDialogService? _dialogService;
+    private readonly ILocalizationService? _localizationService;
+    private readonly IPlatformAdapter? _platformAdapter;
+    private readonly IPlatformDetector? _platformDetector;
 
     private CancellationTokenSource? _installCts;
 
@@ -46,16 +50,34 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <para>对话框服务。</para>
     /// The dialog service.
     /// </param>
+    /// <param name="localizationService">
+    /// <para>本地化服务。</para>
+    /// The localization service.
+    /// </param>
+    /// <param name="platformAdapter">
+    /// <para>平台适配器。</para>
+    /// The platform adapter.
+    /// </param>
+    /// <param name="platformDetector">
+    /// <para>平台检测器。</para>
+    /// The platform detector.
+    /// </param>
     public MainWindowViewModel(
         IInstallerService installerService,
         IReleaseApiService releaseApiService,
         IDownloadService downloadService,
-        IDialogService dialogService)
+        IDialogService dialogService,
+        ILocalizationService localizationService,
+        IPlatformAdapter platformAdapter,
+        IPlatformDetector platformDetector)
     {
         _installerService = installerService;
         _releaseApiService = releaseApiService;
         _downloadService = downloadService;
         _dialogService = dialogService;
+        _localizationService = localizationService;
+        _platformAdapter = platformAdapter;
+        _platformDetector = platformDetector;
     }
 
     #region Step Visibility
@@ -146,6 +168,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private double _installProgressValue;
 
     [ObservableProperty]
+    private string _installProgressText = string.Empty;
+
+    [ObservableProperty]
     private string _installStatusText = string.Empty;
 
     [ObservableProperty]
@@ -153,6 +178,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isInstallFailed;
+
+    [ObservableProperty]
+    private int _retryCount;
 
     #endregion
 
@@ -188,7 +216,7 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <para>获取安装按钮的显示文本。</para>
     /// Gets the display text for the install button.
     /// </summary>
-    public string InstallButtonText => IsUpdate ? "更新" : "安装";
+    public string InstallButtonText => IsUpdate ? (_localizationService?["Update"] ?? "更新") : "安装";
 
     partial void OnIsUpdateChanged(bool value) => OnPropertyChanged(nameof(InstallButtonText));
 
@@ -285,19 +313,51 @@ public partial class MainWindowViewModel : ViewModelBase
         CurrentStep = InstallStep.Installing;
         IsInstallFailed = false;
         InstallProgressValue = 0;
-        InstallStatusText = "准备安装...";
+        InstallStatusText = _localizationService?["PrepareInstall"] ?? "准备安装...";
 
         InstallSubSteps =
         [
-            new() { DisplayName = "下载安装包", Kind = InstallProgressKind.Downloading },
-            new() { DisplayName = "校验文件完整性", Kind = InstallProgressKind.Verifying },
-            new() { DisplayName = "安装应用", Kind = InstallProgressKind.Installing },
+            new() { DisplayName = _localizationService?["Step_Download"] ?? "下载安装包", Kind = InstallProgressKind.Downloading },
+            new() { DisplayName = _localizationService?["Step_Verify"] ?? "校验文件完整性", Kind = InstallProgressKind.Verifying },
+            new() { DisplayName = _localizationService?["Step_Extract"] ?? "安装应用", Kind = InstallProgressKind.Installing },
         ];
 
         _installCts = new CancellationTokenSource();
 
         try
         {
+            if (_platformDetector is not null)
+            {
+                try
+                {
+                    var ruleEngine = new DeploymentRuleEngine(_platformDetector);
+                    var constraints = new[]
+                    {
+                        new PlatformConstraint
+                        {
+                            RequiredOS = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? PlatformOS.Windows
+                                       : RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? PlatformOS.macOS
+                                       : PlatformOS.Linux,
+                            MinimumDiskSpaceBytes = 500L * 1024 * 1024,
+                        },
+                    };
+                    var checkResult = await ruleEngine.CheckPlatformConstraintsAsync(constraints, _installCts.Token, InstallPath).ConfigureAwait(false);
+                    if (!checkResult)
+                    {
+                        IsInstallFailed = true;
+                        InstallStatusText = _localizationService?["PlatformCheckFailed"] ?? "平台检查未通过";
+                        await (_dialogService?.ShowErrorAsync(_localizationService?["PlatformCheckFailed"] ?? "平台检查未通过", _localizationService?["DiskSpaceInsufficient"] ?? "磁盘空间不足") ?? Task.CompletedTask);
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    IsInstallFailed = true;
+                    InstallStatusText = $"{_localizationService?["PlatformCheckFailed"] ?? "平台检查未通过"}: {ex.Message}";
+                    return;
+                }
+            }
+
             var configuration = new DeploymentConfiguration
             {
                 AppName = "UotanToolboxNT",
@@ -323,19 +383,19 @@ public partial class MainWindowViewModel : ViewModelBase
             else
             {
                 IsInstallFailed = true;
-                InstallStatusText = result.ErrorMessage ?? "安装失败";
+                InstallStatusText = result.ErrorMessage ?? (_localizationService?["InstallFailed"] ?? "安装失败");
             }
         }
         catch (OperationCanceledException)
         {
             IsInstallFailed = true;
-            InstallStatusText = "安装已取消";
+            InstallStatusText = _localizationService?["InstallCancelled"] ?? "安装已取消";
         }
         catch (Exception ex)
         {
             IsInstallFailed = true;
-            InstallStatusText = $"安装失败: {ex.Message}";
-            await _dialogService.ShowErrorAsync("安装失败", ex.Message);
+            InstallStatusText = $"{_localizationService?["InstallFailed"] ?? "安装失败"}: {ex.Message}";
+            await _dialogService.ShowErrorAsync(_localizationService?["InstallFailed"] ?? "安装失败", ex.Message);
         }
         finally
         {
@@ -356,6 +416,45 @@ public partial class MainWindowViewModel : ViewModelBase
     private void LaunchApp()
     {
         _installerService?.LaunchAndExit(InstallPath);
+    }
+
+    /// <summary>
+    /// <para>打开安装目录命令，使用系统文件管理器打开安装路径。</para>
+    /// Open install directory command that opens the install path in the system file explorer.
+    /// </summary>
+    [RelayCommand]
+    private async Task OpenInstallDirectoryAsync()
+    {
+        if (_platformAdapter is null || string.IsNullOrEmpty(InstallPath)) return;
+
+        try
+        {
+            await _platformAdapter.OpenInFileExplorerAsync(InstallPath).ConfigureAwait(false);
+        }
+        catch
+        {
+        }
+    }
+
+    /// <summary>
+    /// <para>重试安装命令，最多允许重试 3 次。</para>
+    /// Retry install command, allowing up to 3 retries.
+    /// </summary>
+    [RelayCommand]
+    private async Task RetryAsync()
+    {
+        if (_installerService is null || _dialogService is null || SelectedMirror is null) return;
+
+        if (RetryCount >= 3)
+        {
+            await _dialogService.ShowErrorAsync(
+                _localizationService?["InstallFailed"] ?? "安装失败",
+                "多次重试失败，请检查网络连接或联系支持。");
+            return;
+        }
+
+        RetryCount++;
+        await InstallAsync();
     }
 
     /// <summary>
@@ -393,7 +492,34 @@ public partial class MainWindowViewModel : ViewModelBase
         }
         catch
         {
-            VersionText = "v0.0.0";
+            VersionText = _localizationService?["VersionUnavailable"] ?? "获取失败";
+        }
+    }
+
+    /// <summary>
+    /// <para>检查是否有新版本可用，并在用户确认后执行自更新。</para>
+    /// Checks for a new version available and performs a self-update after user confirmation.
+    /// </summary>
+    public async Task CheckForSelfUpdateAsync()
+    {
+        if (_installerService is null || _dialogService is null) return;
+
+        try
+        {
+            var hasUpdate = await _releaseApiService!.CheckSelfUpdateAsync(
+                System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "0.0.0.0",
+                default).ConfigureAwait(false);
+
+            if (!hasUpdate) return;
+
+            var updateText = _localizationService?["Update"] ?? "更新";
+            var confirmed = await _dialogService.ShowConfirmAsync(updateText, "检测到新版本，是否立即更新？").ConfigureAwait(false);
+            if (!confirmed) return;
+
+            await _installerService.SelfUpdateAsync().ConfigureAwait(false);
+        }
+        catch
+        {
         }
     }
 
@@ -450,6 +576,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private void OnDeploymentProgress(DeploymentProgress progress)
     {
         InstallProgressValue = progress.ProgressValue;
+        InstallProgressText = progress.ProgressValue > 0 ? $"{(int)(progress.ProgressValue * 100)}%" : string.Empty;
         InstallStatusText = progress.Message;
 
         var targetKind = progress.Kind switch

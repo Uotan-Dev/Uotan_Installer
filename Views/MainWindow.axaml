@@ -187,15 +187,34 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
 
-          <ProgressBar Classes="install"
-                       Value="{Binding InstallProgressValue}"
-                       Maximum="1"
-                       Margin="0,0,0,8" />
+          <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+            <ProgressBar Classes="install"
+                         Value="{Binding InstallProgressValue}"
+                         Maximum="1" />
+            <TextBlock Grid.Column="1"
+                       Text="{Binding InstallProgressText}"
+                       FontSize="13"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       VerticalAlignment="Center"
+                       Margin="8,0,0,0"
+                       Width="40"
+                       TextAlignment="Right" />
+          </Grid>
 
           <TextBlock Text="{Binding InstallStatusText}"
                      FontSize="13"
                      Foreground="{DynamicResource TextSecondaryBrush}"
                      TextWrapping="Wrap" />
+
+          <StackPanel IsVisible="{Binding IsInstallFailed}"
+                      Orientation="Horizontal"
+                      HorizontalAlignment="Center"
+                      Margin="0,8,0,0">
+            <Button Classes="secondary"
+                    Content="重试"
+                    Command="{Binding RetryCommand}"
+                    Padding="16,8" />
+          </StackPanel>
         </StackPanel>
 
         <!-- Step 4: Finish -->
@@ -223,6 +242,9 @@
 
           <StackPanel Classes="button-row"
                       HorizontalAlignment="Center">
+            <Button Classes="secondary"
+                    Content="打开安装目录"
+                    Command="{Binding OpenInstallDirectoryCommand}" />
             <Button Classes="accent"
                     Content="启动柚坛工具箱"
                     Command="{Binding LaunchAppCommand}" />

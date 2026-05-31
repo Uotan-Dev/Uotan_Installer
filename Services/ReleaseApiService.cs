@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using UotanInstaller.App.Models;
+using UotanInstaller.App.Services.Deployment;
 
 namespace UotanInstaller.App.Services;
 
@@ -48,9 +49,12 @@ public sealed class ReleaseApiService : IReleaseApiService
 
         var version = release.TagName ?? throw new InvalidOperationException("Release tag name is null.");
 
-        var mirrors = new List<GenericPatchPackageMirror>();
+        var currentPlatform = DetectCurrentPlatform();
         var arch = RuntimeInformation.OSArchitecture;
         var archSuffix = arch == Architecture.Arm64 ? "arm64" : "x64";
+        var platformPrefix = GetPlatformAssetPrefix(currentPlatform);
+
+        var mirrors = new List<GenericPatchPackageMirror>();
 
         foreach (var asset in release.Assets ?? [])
         {
@@ -62,23 +66,21 @@ public sealed class ReleaseApiService : IReleaseApiService
                 continue;
             }
 
-            if (asset.Name.Contains($"Windows_{archSuffix}", StringComparison.OrdinalIgnoreCase))
+            if (IsPlatformAssetMatch(asset.Name, currentPlatform, archSuffix))
             {
                 mirrors.Add(new GenericPatchPackageMirror
                 {
                     Url = asset.BrowserDownloadUrl,
-                    MirrorName = $"UotanToolbox Windows {archSuffix}",
+                    MirrorName = $"UotanToolbox {platformPrefix} {archSuffix}",
                 });
             }
         }
 
         if (mirrors.Count == 0)
         {
-            mirrors.Add(new GenericPatchPackageMirror
-            {
-                Url = $"{GitHubReleasesDownloadUrl}/{version}/UotanToolbox_Windows_x64_{version}.zip",
-                MirrorName = "UotanToolbox Windows x64",
-            });
+            throw new PlatformNotSupportedDeploymentException(
+                $"No matching package found for platform '{currentPlatform}' with architecture '{archSuffix}'.",
+                currentPlatform);
         }
 
         var mirrorSites = _gitHubMirrorService.GetMirrorSites();
@@ -106,7 +108,7 @@ public sealed class ReleaseApiService : IReleaseApiService
         var sha256 = string.Empty;
         var matchedAsset = release.Assets?.FirstOrDefault(a =>
             a.Name is not null &&
-            a.Name.Contains($"Windows_{archSuffix}", StringComparison.OrdinalIgnoreCase) &&
+            IsPlatformAssetMatch(a.Name, currentPlatform, archSuffix) &&
             !a.Name.Contains("Installer", StringComparison.OrdinalIgnoreCase) &&
             !a.Name.Contains("Deployment", StringComparison.OrdinalIgnoreCase) &&
             a.Digest is not null);
@@ -140,8 +142,81 @@ public sealed class ReleaseApiService : IReleaseApiService
         var release = JsonSerializer.Deserialize(json, AppJsonContext.Default.GitHubRelease)
             ?? throw new InvalidOperationException("Failed to deserialize GitHub release response.");
 
-        var latestVersion = WindowsVersion.Parse(release.TagName ?? "0.0.0.0");
-        var current = WindowsVersion.Parse(currentVersion);
+        var latestVersion = SemanticVersion.Parse(release.TagName ?? "0.0.0.0");
+        var current = SemanticVersion.Parse(currentVersion);
         return current < latestVersion;
+    }
+
+    /// <summary>
+    /// <para>检测当前运行平台的操作系统类型。</para>
+    /// Detects the operating system type of the current runtime platform.
+    /// </summary>
+    /// <returns>
+    /// <para>当前平台对应的 PlatformOS 枚举值。</para>
+    /// The PlatformOS enum value corresponding to the current platform.
+    /// </returns>
+    private static PlatformOS DetectCurrentPlatform()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return PlatformOS.Windows;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            return PlatformOS.macOS;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            return PlatformOS.Linux;
+        return PlatformOS.Unknown;
+    }
+
+    /// <summary>
+    /// <para>根据平台类型获取资源名称中使用的平台前缀字符串。</para>
+    /// Gets the platform prefix string used in asset names based on the platform type.
+    /// </summary>
+    /// <param name="platform">
+    /// <para>操作系统平台类型。</para>
+    /// The operating system platform type.
+    /// </param>
+    /// <returns>
+    /// <para>资源名称中的平台前缀字符串。</para>
+    /// The platform prefix string in asset names.
+    /// </returns>
+    private static string GetPlatformAssetPrefix(PlatformOS platform) => platform switch
+    {
+        PlatformOS.Windows => "Windows",
+        PlatformOS.macOS => "macOS",
+        PlatformOS.Linux => "Linux",
+        _ => "Unknown",
+    };
+
+    /// <summary>
+    /// <para>判断资源名称是否匹配当前平台和架构后缀。</para>
+    /// Determines whether the asset name matches the current platform and architecture suffix.
+    /// </summary>
+    /// <param name="assetName">
+    /// <para>资源文件名称。</para>
+    /// The asset file name.
+    /// </param>
+    /// <param name="platform">
+    /// <para>目标操作系统平台类型。</para>
+    /// The target operating system platform type.
+    /// </param>
+    /// <param name="archSuffix">
+    /// <para>架构后缀，如 "x64" 或 "arm64"。</para>
+    /// The architecture suffix, e.g. "x64" or "arm64".
+    /// </param>
+    /// <returns>
+    /// <para>如果资源名称匹配当前平台和架构，返回 true；否则返回 false。</para>
+    /// True if the asset name matches the current platform and architecture; otherwise false.
+    /// </returns>
+    private static bool IsPlatformAssetMatch(string assetName, PlatformOS platform, string archSuffix)
+    {
+        var suffix = $"_{archSuffix}";
+        return platform switch
+        {
+            PlatformOS.Windows => assetName.Contains($"Windows{suffix}", StringComparison.OrdinalIgnoreCase),
+            PlatformOS.macOS => assetName.Contains($"macOS{suffix}", StringComparison.OrdinalIgnoreCase) ||
+                                assetName.Contains($"Darwin{suffix}", StringComparison.OrdinalIgnoreCase) ||
+                                assetName.Contains($"Mac{suffix}", StringComparison.OrdinalIgnoreCase),
+            PlatformOS.Linux => assetName.Contains($"Linux{suffix}", StringComparison.OrdinalIgnoreCase),
+            _ => false,
+        };
     }
 }

@@ -21,6 +21,8 @@ public sealed class InstallerService : IInstallerService
     private readonly IProcessService _processService;
     private readonly IPlatformDetector _platformDetector;
     private readonly IPlatformAdapter _platformAdapter;
+    private readonly ILocalizationService _localizationService;
+    private readonly IGitHubMirrorService _gitHubMirrorService;
 
     /// <summary>
     /// <para>初始化 InstallerService 实例</para>
@@ -58,6 +60,14 @@ public sealed class InstallerService : IInstallerService
     /// <para>平台适配器</para>
     /// The platform adapter
     /// </param>
+    /// <param name="localizationService">
+    /// <para>本地化服务</para>
+    /// The localization service
+    /// </param>
+    /// <param name="gitHubMirrorService">
+    /// <para>GitHub 镜像服务</para>
+    /// The GitHub mirror service
+    /// </param>
     public InstallerService(
         IReleaseApiService releaseApiService,
         IFileService fileService,
@@ -66,7 +76,9 @@ public sealed class InstallerService : IInstallerService
         IHttpService httpService,
         IProcessService processService,
         IPlatformDetector platformDetector,
-        IPlatformAdapter platformAdapter)
+        IPlatformAdapter platformAdapter,
+        ILocalizationService localizationService,
+        IGitHubMirrorService gitHubMirrorService)
     {
         _releaseApiService = releaseApiService;
         _fileService = fileService;
@@ -76,13 +88,15 @@ public sealed class InstallerService : IInstallerService
         _processService = processService;
         _platformDetector = platformDetector;
         _platformAdapter = platformAdapter;
+        _localizationService = localizationService;
+        _gitHubMirrorService = gitHubMirrorService;
     }
 
     /// <inheritdoc/>
-    public Task<InstallerConfig> GetConfigAsync(CancellationToken cancellationToken = default)
+    public async Task<InstallerConfig> GetConfigAsync(CancellationToken cancellationToken = default)
     {
         var installDir = _platformAdapter.GetDefaultInstallDirectory(AppName);
-        var currVersion = TryGetInstalledVersion(installDir);
+        var currVersion = await TryGetInstalledVersionAsync(installDir).ConfigureAwait(false);
         var isUpdate = currVersion is not null;
 
         var config = new InstallerConfig
@@ -94,7 +108,7 @@ public sealed class InstallerService : IInstallerService
             InstallPath = installDir,
         };
 
-        return Task.FromResult(config);
+        return config;
     }
 
     /// <inheritdoc/>
@@ -105,36 +119,36 @@ public sealed class InstallerService : IInstallerService
         var packageFileName = configuration.PackageFileName ?? "UotanToolbox.zip";
         var packagePath = Path.Combine(tempDir, packageFileName);
 
-        var pipeline = new DeploymentPipeline();
+        var pipeline = new DeploymentPipeline(_localizationService);
 
         if (!configuration.OfflineMode)
         {
             var downloadUrl = configuration.SelectedMirrorUrl ?? configuration.PackageSources.FirstOrDefault()?.Url ?? string.Empty;
-            pipeline.AddStep(new DownloadStep(downloadUrl, packagePath, _downloadService));
+            pipeline.AddStep(new DownloadStep(downloadUrl, packagePath, _downloadService, _localizationService));
 
             if (!string.IsNullOrEmpty(configuration.Sha256))
             {
-                pipeline.AddStep(new VerifyStep(packagePath, configuration.Sha256, _fileService));
+                pipeline.AddStep(new VerifyStep(packagePath, configuration.Sha256, _fileService, _localizationService));
             }
         }
 
-        pipeline.AddStep(new ExtractStep(packagePath, installDir, configuration.FileRules));
+        pipeline.AddStep(new ExtractStep(packagePath, installDir, _localizationService, configuration.FileRules));
 
         if (configuration.CreateDesktopShortcut)
         {
-            var exePath = FindExecutable(installDir);
+            var exePath = await _platformAdapter.FindExecutableAsync(installDir).ConfigureAwait(false);
             if (exePath is not null)
             {
-                pipeline.AddStep(new CreateShortcutStep(AppName, exePath, _platformAdapter));
+                pipeline.AddStep(new CreateShortcutStep(AppName, exePath, _platformAdapter, _localizationService));
             }
         }
 
         if (configuration.LaunchAfterInstall)
         {
-            var exePath = FindExecutable(installDir);
+            var exePath = await _platformAdapter.FindExecutableAsync(installDir).ConfigureAwait(false);
             if (exePath is not null)
             {
-                pipeline.AddStep(new LaunchStep(exePath, _platformAdapter));
+                pipeline.AddStep(new LaunchStep(exePath, _platformAdapter, _localizationService));
             }
         }
 
@@ -142,14 +156,14 @@ public sealed class InstallerService : IInstallerService
 
         if (result.IsSuccess)
         {
-            try { File.Delete(packagePath); } catch { }
+            try { File.Delete(packagePath); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Warning: Failed to delete package file: {ex.Message}"); }
         }
 
         return result;
     }
 
     /// <inheritdoc/>
-    public async Task SelfUpdateAsync(CancellationToken cancellationToken = default)
+    public async Task SelfUpdateAsync(IProgress<(long Downloaded, long Total)>? downloadProgress = null, CancellationToken cancellationToken = default)
     {
         var hasUpdate = await _releaseApiService.CheckSelfUpdateAsync(GetCurrentVersion(), cancellationToken).ConfigureAwait(false);
         if (!hasUpdate) return;
@@ -168,13 +182,67 @@ public sealed class InstallerService : IInstallerService
 
         if (asset?.BrowserDownloadUrl is null) return;
 
+        var downloadUrl = asset.BrowserDownloadUrl;
+        var mirrors = _gitHubMirrorService.GetMirrorSites();
+        var enabledMirror = mirrors.FirstOrDefault(m => m.IsEnabled);
+        if (enabledMirror is not null)
+        {
+            var mirrorUrl = _gitHubMirrorService.CreateMirrorUrl(enabledMirror, downloadUrl);
+            if (!string.IsNullOrEmpty(mirrorUrl)) downloadUrl = mirrorUrl;
+        }
+
         var exePath = Environment.ProcessPath
             ?? throw new InvalidOperationException("Cannot determine the current executable path.");
-        var outdatedPath = Path.ChangeExtension(exePath, ".old");
+        var backupPath = exePath + ".bak";
+        var tempDownloadPath = exePath + ".tmp";
 
-        try { File.Delete(outdatedPath); } catch { }
+        try { File.Delete(backupPath); } catch { }
+        try { File.Delete(tempDownloadPath); } catch { }
 
-        var newInstallerBytes = await client.GetByteArrayAsync(asset.BrowserDownloadUrl, cancellationToken).ConfigureAwait(false);
+        using (var downloadResponse = await client.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false))
+        {
+            downloadResponse.EnsureSuccessStatusCode();
+
+            var totalBytes = downloadResponse.Content.Headers.ContentLength ?? 0;
+            using var contentStream = await downloadResponse.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            using var fileStream = new FileStream(tempDownloadPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
+
+            var buffer = new byte[8192];
+            long totalDownloaded = 0;
+            int bytesRead;
+
+            while ((bytesRead = await contentStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+            {
+                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+                totalDownloaded += bytesRead;
+
+                if (totalBytes > 0)
+                {
+                    downloadProgress?.Report((totalDownloaded, totalBytes));
+                }
+            }
+        }
+
+        if (asset.Digest is not null)
+        {
+            var digestParts = asset.Digest.Split(':');
+            if (digestParts.Length == 2)
+            {
+                var expectedHash = digestParts[1];
+                var actualHash = await _fileService.ComputeSha256Async(tempDownloadPath, cancellationToken).ConfigureAwait(false);
+                if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    try { File.Delete(tempDownloadPath); } catch { }
+                    throw new VerificationException(
+                        $"Self-update verification failed. Expected: {expectedHash}, Actual: {actualHash}",
+                        expectedHash,
+                        actualHash,
+                        tempDownloadPath);
+                }
+            }
+        }
+
+        try { File.Delete(backupPath); } catch { }
 
         var renameSuccess = false;
         for (var attempt = 1; attempt <= 5; attempt++)
@@ -186,7 +254,7 @@ public sealed class InstallerService : IInstallerService
 
             try
             {
-                File.Move(exePath, outdatedPath);
+                File.Move(exePath, backupPath);
                 renameSuccess = true;
                 break;
             }
@@ -204,17 +272,27 @@ public sealed class InstallerService : IInstallerService
         {
             try
             {
-                await File.WriteAllBytesAsync(exePath, newInstallerBytes, cancellationToken).ConfigureAwait(false);
+                File.Move(tempDownloadPath, exePath);
             }
             catch
             {
-                try { File.Move(outdatedPath, exePath); } catch { }
+                try { File.Move(backupPath, exePath); } catch { }
                 throw;
             }
+
+            try { File.Delete(backupPath); } catch { }
         }
         else
         {
-            await File.WriteAllBytesAsync(exePath, newInstallerBytes, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                File.Move(tempDownloadPath, exePath);
+            }
+            catch
+            {
+                try { File.Delete(tempDownloadPath); } catch { }
+                throw;
+            }
         }
 
         _platformAdapter.RequestElevation(exePath);
@@ -225,7 +303,7 @@ public sealed class InstallerService : IInstallerService
     public void LaunchAndExit(string? installPath = null)
     {
         var installDir = installPath ?? _platformAdapter.GetDefaultInstallDirectory(AppName);
-        var exePath = FindExecutable(installDir);
+        var exePath = _platformAdapter.FindExecutableAsync(installDir).GetAwaiter().GetResult();
 
         if (exePath is not null && File.Exists(exePath))
         {
@@ -233,8 +311,17 @@ public sealed class InstallerService : IInstallerService
             {
                 _platformAdapter.LaunchApplication(exePath);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Failed to launch application: {ex.Message}");
+                var launchFailedText = _localizationService["LaunchFailed"];
+                try
+                {
+                    _dialogService.ShowErrorAsync(launchFailedText, ex.Message).GetAwaiter().GetResult();
+                }
+                catch
+                {
+                }
             }
         }
 
@@ -245,7 +332,7 @@ public sealed class InstallerService : IInstallerService
     public async Task CreateDesktopShortcutAsync(string? installPath = null, CancellationToken cancellationToken = default)
     {
         var installDir = installPath ?? _platformAdapter.GetDefaultInstallDirectory(AppName);
-        var exePath = FindExecutable(installDir);
+        var exePath = await _platformAdapter.FindExecutableAsync(installDir).ConfigureAwait(false);
 
         if (exePath is not null)
         {
@@ -260,9 +347,9 @@ public sealed class InstallerService : IInstallerService
         await _fileService.CleanupTempFilesAsync(tempDir, "UotanToolbox.zip", cancellationToken).ConfigureAwait(false);
     }
 
-    private static string? TryGetInstalledVersion(string installDir)
+    private async Task<string?> TryGetInstalledVersionAsync(string installDir)
     {
-        var exePath = FindExecutable(installDir);
+        var exePath = await _platformAdapter.FindExecutableAsync(installDir).ConfigureAwait(false);
         if (exePath is null || !File.Exists(exePath)) return null;
 
         try
@@ -276,20 +363,14 @@ public sealed class InstallerService : IInstallerService
         }
     }
 
-    private static string? FindExecutable(string directory)
-    {
-        if (!Directory.Exists(directory)) return null;
-
-        var exeFiles = Directory.GetFiles(directory, "UotanToolbox*.exe", SearchOption.TopDirectoryOnly);
-        if (exeFiles.Length > 0) return exeFiles[0];
-
-        var allExeFiles = Directory.GetFiles(directory, "*.exe", SearchOption.TopDirectoryOnly);
-        return allExeFiles.Length > 0 ? allExeFiles[0] : null;
-    }
-
     private static string GetCurrentVersion()
     {
-        var version = Environment.Version;
-        return $"{version.Major}.{version.Minor}.{version.Build}.0";
+        var version = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version;
+        if (version is not null)
+        {
+            return $"{version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
+        }
+
+        return "0.0.0.0";
     }
 }

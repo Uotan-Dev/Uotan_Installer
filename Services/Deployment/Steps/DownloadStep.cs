@@ -9,13 +9,14 @@ public sealed class DownloadStep : IDeploymentStep
     private readonly string _url;
     private readonly string _targetPath;
     private readonly IDownloadService _downloadService;
+    private readonly ILocalizationService _localizationService;
     private readonly int _threadCount;
 
     /// <summary>
     /// <para>获取步骤名称。</para>
     /// Gets the step name.
     /// </summary>
-    public string Name { get; } = "下载安装包";
+    public string Name { get; }
 
     /// <summary>
     /// <para>获取步骤类型。</para>
@@ -45,16 +46,22 @@ public sealed class DownloadStep : IDeploymentStep
     /// <para>下载服务实例。</para>
     /// The download service instance.
     /// </param>
+    /// <param name="localizationService">
+    /// <para>本地化服务实例。</para>
+    /// The localization service instance.
+    /// </param>
     /// <param name="threadCount">
     /// <para>下载线程数，0 表示根据处理器数量自动确定。</para>
     /// The number of download threads; 0 to auto-determine based on processor count.
     /// </param>
-    public DownloadStep(string url, string targetPath, IDownloadService downloadService, int threadCount = 0)
+    public DownloadStep(string url, string targetPath, IDownloadService downloadService, ILocalizationService localizationService, int threadCount = 0)
     {
         _url = url;
         _targetPath = targetPath;
         _downloadService = downloadService;
+        _localizationService = localizationService;
         _threadCount = threadCount <= 0 ? Environment.ProcessorCount : threadCount;
+        Name = _localizationService["Step_Download"];
     }
 
     /// <summary>
@@ -106,7 +113,7 @@ public sealed class DownloadStep : IDeploymentStep
                 StepName = Name,
                 Kind = Kind,
                 ProgressValue = 1.0,
-                Message = "下载完成",
+                Message = _localizationService["Step_DownloadComplete"],
             });
 
             return new DeploymentStepResult
@@ -128,16 +135,17 @@ public sealed class DownloadStep : IDeploymentStep
         }
     }
 
-    private static string FormatProgressMessage(long downloaded, long total)
+    private string FormatProgressMessage(long downloaded, long total)
     {
         var downloadedMB = downloaded / 1024.0 / 1024.0;
+        var downloadingText = _localizationService["Step_Downloading"];
         if (total > 0)
         {
             var totalMB = total / 1024.0 / 1024.0;
             var percentage = (double)downloaded / total * 100;
-            return $"正在下载... {downloadedMB:F1}/{totalMB:F1} MB ({percentage:F0}%)";
+            return $"{downloadingText} {downloadedMB:F1}/{totalMB:F1} MB ({percentage:F0}%)";
         }
 
-        return $"正在下载... {downloadedMB:F1} MB";
+        return $"{downloadingText} {downloadedMB:F1} MB";
     }
 }

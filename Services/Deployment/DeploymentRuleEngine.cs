@@ -104,11 +104,15 @@ public sealed class DeploymentRuleEngine : IDeploymentRuleEngine
     /// <para>取消令牌。</para>
     /// Cancellation token.
     /// </param>
+    /// <param name="installPath">
+    /// <para>目标安装路径，用于确定检查磁盘空间的目标分区；为 null 时使用系统默认分区。</para>
+    /// The target installation path used to determine the partition for disk space checking; null uses the system default partition.
+    /// </param>
     /// <returns>
     /// <para>若满足所有约束返回 true，否则返回 false。</para>
     /// True if all constraints are satisfied; otherwise false.
     /// </returns>
-    public Task<bool> CheckPlatformConstraintsAsync(IEnumerable<PlatformConstraint> constraints, CancellationToken ct)
+    public Task<bool> CheckPlatformConstraintsAsync(IEnumerable<PlatformConstraint> constraints, CancellationToken ct, string? installPath = null)
     {
         var platform = _platformDetector.Detect();
 
@@ -122,7 +126,7 @@ public sealed class DeploymentRuleEngine : IDeploymentRuleEngine
             if (constraint.MinimumVersion is not null && !IsVersionSatisfied(platform.Version, constraint.MinimumVersion))
                 return Task.FromResult(false);
 
-            if (constraint.MinimumDiskSpaceBytes > 0 && !CheckDiskSpace(constraint.MinimumDiskSpaceBytes))
+            if (constraint.MinimumDiskSpaceBytes > 0 && !CheckDiskSpace(constraint.MinimumDiskSpaceBytes, installPath))
                 return Task.FromResult(false);
         }
 
@@ -219,14 +223,11 @@ public sealed class DeploymentRuleEngine : IDeploymentRuleEngine
         return parts;
     }
 
-    internal static bool CheckDiskSpace(long minimumBytes)
+    internal static bool CheckDiskSpace(long minimumBytes, string? installPath = null)
     {
         try
         {
-            var rootPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                ? "C:\\"
-                : "/";
-
+            var rootPath = GetRootPath(installPath);
             var drive = new DriveInfo(rootPath);
             return drive.IsReady && drive.AvailableFreeSpace >= minimumBytes;
         }
@@ -234,5 +235,27 @@ public sealed class DeploymentRuleEngine : IDeploymentRuleEngine
         {
             return false;
         }
+    }
+
+    private static string GetRootPath(string? path)
+    {
+        if (!string.IsNullOrEmpty(path))
+        {
+            try
+            {
+                var fullPath = Path.GetFullPath(path);
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    return fullPath.Substring(0, 2) + "\\";
+                }
+
+                return "/";
+            }
+            catch
+            {
+            }
+        }
+
+        return RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "C:\\" : "/";
     }
 }

@@ -83,4 +83,32 @@ public interface IPlatformAdapter
     /// The absolute path of the temporary file directory.
     /// </returns>
     string GetTempDirectory();
+
+    /// <summary>
+    /// <para>在指定安装目录中查找应用程序的可执行文件路径。</para>
+    /// Finds the application executable file path in the specified installation directory.
+    /// </summary>
+    /// <param name="installPath">
+    /// <para>安装目录路径。</para>
+    /// The installation directory path.
+    /// </param>
+    /// <returns>
+    /// <para>表示异步操作的任务，结果为可执行文件路径；若未找到则返回 null。</para>
+    /// A task representing the asynchronous operation, with the result being the executable file path; or null if not found.
+    /// </returns>
+    Task<string?> FindExecutableAsync(string installPath);
+
+    /// <summary>
+    /// <para>使用系统文件管理器打开指定目录。</para>
+    /// Opens the specified directory using the system file explorer.
+    /// </summary>
+    /// <param name="path">
+    /// <para>要打开的目录路径。</para>
+    /// The directory path to open.
+    /// </param>
+    /// <returns>
+    /// <para>表示异步操作的 Task。</para>
+    /// A task representing the asynchronous operation.
+    /// </returns>
+    Task OpenInFileExplorerAsync(string path);
 }
