@@ -67,4 +67,14 @@
   <s:String x:Key="RetryLimitReached">多次重試失敗，請檢查網路連線或聯絡支援。</s:String>
   <s:String x:Key="SelfUpdateConfirm">偵測到新版本，是否立即更新？</s:String>
   <s:String x:Key="SelectInstallPath">選擇安裝路徑</s:String>
+  <s:String x:Key="ChannelLabel">發布管道</s:String>
+  <s:String x:Key="Channel_Release">正式版</s:String>
+  <s:String x:Key="Channel_PreRelease">預發布版</s:String>
+  <s:String x:Key="Channel_Beta">測試版</s:String>
+  <s:String x:Key="Channel_Nightly">每日構建版</s:String>
+  <s:String x:Key="Channel_Release_Desc">穩定發布版本，推薦大多數使用者使用</s:String>
+  <s:String x:Key="Channel_PreRelease_Desc">預發布版本，包含即將發布的最新功能</s:String>
+  <s:String x:Key="Channel_Beta_Desc">測試版本，可能存在不穩定因素</s:String>
+  <s:String x:Key="Channel_Nightly_Desc">每日構建版本，包含最新的開發程式碼</s:String>
+  <s:String x:Key="Channel_Warning">此管道版本可能不穩定，僅建議測試用途。生產環境請使用正式版。</s:String>
 </ResourceDictionary>

@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using UotanInstaller.App.Models;
@@ -16,6 +17,7 @@ public sealed class ReleaseApiService : IReleaseApiService
 
     private readonly IHttpService _httpService;
     private readonly IGitHubMirrorService _gitHubMirrorService;
+    private readonly IChannelService _channelService;
 
     /// <summary>
     /// <para>初始化 ReleaseApiService 实例</para>
@@ -29,23 +31,21 @@ public sealed class ReleaseApiService : IReleaseApiService
     /// <para>GitHub 镜像站点服务</para>
     /// The GitHub mirror site service
     /// </param>
-    public ReleaseApiService(IHttpService httpService, IGitHubMirrorService gitHubMirrorService)
+    /// <param name="channelService">
+    /// <para>发布渠道服务</para>
+    /// The channel service
+    /// </param>
+    public ReleaseApiService(IHttpService httpService, IGitHubMirrorService gitHubMirrorService, IChannelService channelService)
     {
         _httpService = httpService;
         _gitHubMirrorService = gitHubMirrorService;
+        _channelService = channelService;
     }
 
     /// <inheritdoc/>
-    public async Task<GenericPatchData> GetPatchDataAsync(CancellationToken cancellationToken = default)
+    public async Task<GenericPatchData> GetPatchDataAsync(ReleaseChannel channel = ReleaseChannel.Release, CancellationToken cancellationToken = default)
     {
-        var client = _httpService.Client;
-        var url = $"{GitHubApiBaseUrl}/releases/latest";
-        var response = await client.GetAsync(url, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-
-        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        var release = JsonSerializer.Deserialize(json, AppJsonContext.Default.GitHubRelease)
-            ?? throw new InvalidOperationException("Failed to deserialize GitHub release response.");
+        var release = await _channelService.FetchReleaseByChannelAsync(channel, cancellationToken).ConfigureAwait(false);
 
         var version = release.TagName ?? throw new InvalidOperationException("Release tag name is null.");
 
@@ -131,20 +131,35 @@ public sealed class ReleaseApiService : IReleaseApiService
     }
 
     /// <inheritdoc/>
-    public async Task<bool> CheckSelfUpdateAsync(string currentVersion, CancellationToken cancellationToken = default)
+    public async Task<bool> CheckSelfUpdateAsync(string currentVersion, ReleaseChannel channel = ReleaseChannel.Release, CancellationToken cancellationToken = default)
     {
-        var client = _httpService.Client;
-        var url = $"{GitHubApiBaseUrl}/releases/latest";
-        var response = await client.GetAsync(url, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-
-        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        var release = JsonSerializer.Deserialize(json, AppJsonContext.Default.GitHubRelease)
-            ?? throw new InvalidOperationException("Failed to deserialize GitHub release response.");
-
+        var release = await _channelService.FetchReleaseByChannelAsync(channel, cancellationToken).ConfigureAwait(false);
         var latestVersion = SemanticVersion.Parse(release.TagName ?? "0.0.0.0");
         var current = SemanticVersion.Parse(currentVersion);
         return current < latestVersion;
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<GitHubRelease>> GetReleasesByChannelAsync(ReleaseChannel channel, CancellationToken cancellationToken = default)
+    {
+        var client = _httpService.Client;
+
+        if (channel == ReleaseChannel.Release || channel == ReleaseChannel.PreRelease)
+        {
+            var url = $"{GitHubApiBaseUrl}/releases?per_page=20";
+            var response = await client.GetAsync(url, cancellationToken).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            var releases = JsonSerializer.Deserialize(json, AppJsonContext.Default.GitHubReleaseArray)
+                ?? throw new InvalidOperationException("Failed to deserialize GitHub releases response.");
+
+            return channel == ReleaseChannel.PreRelease
+                ? releases.Where(r => r.Prerelease && !r.Draft).ToList()
+                : releases.Where(r => !r.Prerelease && !r.Draft).ToList();
+        }
+
+        var singleRelease = await _channelService.FetchReleaseByChannelAsync(channel, cancellationToken).ConfigureAwait(false);
+        return new List<GitHubRelease> { singleRelease };
     }
 
     /// <summary>

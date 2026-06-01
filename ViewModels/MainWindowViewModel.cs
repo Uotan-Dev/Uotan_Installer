@@ -21,6 +21,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly ILocalizationService? _localizationService;
     private readonly IPlatformAdapter? _platformAdapter;
     private readonly IPlatformDetector? _platformDetector;
+    private readonly IChannelService? _channelService;
 
     private CancellationTokenSource? _installCts;
 
@@ -62,6 +63,10 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <para>平台检测器。</para>
     /// The platform detector.
     /// </param>
+    /// <param name="channelService">
+    /// <para>发布渠道服务。</para>
+    /// The channel service.
+    /// </param>
     public MainWindowViewModel(
         IInstallerService installerService,
         IReleaseApiService releaseApiService,
@@ -69,7 +74,8 @@ public partial class MainWindowViewModel : ViewModelBase
         IDialogService dialogService,
         ILocalizationService localizationService,
         IPlatformAdapter platformAdapter,
-        IPlatformDetector platformDetector)
+        IPlatformDetector platformDetector,
+        IChannelService channelService)
     {
         _installerService = installerService;
         _releaseApiService = releaseApiService;
@@ -78,6 +84,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _localizationService = localizationService;
         _platformAdapter = platformAdapter;
         _platformDetector = platformDetector;
+        _channelService = channelService;
 
         if (_localizationService is not null)
         {
@@ -110,6 +117,9 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(AlreadyInstalledDescText));
         OnPropertyChanged(nameof(ReinstallText));
         OnPropertyChanged(nameof(InstallButtonText));
+        OnPropertyChanged(nameof(ChannelLabelText));
+        OnPropertyChanged(nameof(ChannelWarningText));
+        UpdateChannelDisplayNames();
     }
 
     #region Localization Properties
@@ -134,6 +144,26 @@ public partial class MainWindowViewModel : ViewModelBase
     public string AlreadyInstalledText => L("AlreadyInstalled", "已安装");
     public string AlreadyInstalledDescText => L("AlreadyInstalledDesc", "UotanToolbox 已安装在您的设备上。");
     public string ReinstallText => L("Reinstall", "重新安装");
+
+    /// <summary>
+    /// <para>获取渠道标签的本地化文本。</para>
+    /// Gets the localized text for the channel label.
+    /// </summary>
+    public string ChannelLabelText => L("ChannelLabel", "发布渠道");
+
+    /// <summary>
+    /// <para>获取非正式版渠道的警告文本。</para>
+    /// Gets the warning text for non-release channels.
+    /// </summary>
+    public string ChannelWarningText => SelectedChannel is not null && SelectedChannel.Channel != ReleaseChannel.Release
+        ? L("Channel_Warning", "此渠道版本可能不稳定，仅建议测试用途。生产环境请使用正式版。")
+        : string.Empty;
+
+    /// <summary>
+    /// <para>获取是否显示渠道警告。</para>
+    /// Gets whether the channel warning is visible.
+    /// </summary>
+    public bool IsChannelWarningVisible => SelectedChannel is not null && SelectedChannel.Channel != ReleaseChannel.Release;
 
     #endregion
 
@@ -194,6 +224,30 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isCreateShortcut = true;
+
+    #endregion
+
+    #region Channel Selection
+
+    /// <summary>
+    /// <para>获取或设置可用渠道列表。</para>
+    /// Gets or sets the list of available channels.
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<ReleaseChannelInfo> _availableChannels = [];
+
+    /// <summary>
+    /// <para>获取或设置当前选中的渠道。</para>
+    /// Gets or sets the currently selected channel.
+    /// </summary>
+    [ObservableProperty]
+    private ReleaseChannelInfo? _selectedChannel;
+
+    partial void OnSelectedChannelChanged(ReleaseChannelInfo? value)
+    {
+        OnPropertyChanged(nameof(ChannelWarningText));
+        OnPropertyChanged(nameof(IsChannelWarningVisible));
+    }
 
     #endregion
 
@@ -431,6 +485,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 OfflineMode = IsOfflineMode,
                 CreateDesktopShortcut = IsCreateShortcut,
                 LaunchAfterInstall = false,
+                Channel = SelectedChannel?.Channel ?? ReleaseChannel.Release,
             };
 
             var progress = new Progress<DeploymentProgress>(OnDeploymentProgress);
@@ -558,6 +613,20 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             VersionText = L("VersionUnavailable", "获取失败");
         }
+
+        if (_channelService is not null)
+        {
+            try
+            {
+                var channels = await _channelService.GetAvailableChannelsAsync();
+                AvailableChannels = new ObservableCollection<ReleaseChannelInfo>(channels);
+                UpdateChannelDisplayNames();
+                SelectedChannel = AvailableChannels.FirstOrDefault(c => c.Channel == ReleaseChannel.Release);
+            }
+            catch
+            {
+            }
+        }
     }
 
     /// <summary>
@@ -567,6 +636,8 @@ public partial class MainWindowViewModel : ViewModelBase
     public async Task CheckForSelfUpdateAsync()
     {
         if (_installerService is null || _dialogService is null) return;
+
+        if (SelectedChannel is not null && SelectedChannel.Channel != ReleaseChannel.Release) return;
 
         try
         {
@@ -590,6 +661,30 @@ public partial class MainWindowViewModel : ViewModelBase
     #endregion
 
     #region Private Methods
+
+    private void UpdateChannelDisplayNames()
+    {
+        foreach (var channel in AvailableChannels)
+        {
+            channel.DisplayName = channel.Channel switch
+            {
+                ReleaseChannel.Release => L("Channel_Release", "正式版"),
+                ReleaseChannel.PreRelease => L("Channel_PreRelease", "预发布版"),
+                ReleaseChannel.Beta => L("Channel_Beta", "测试版"),
+                ReleaseChannel.Nightly => L("Channel_Nightly", "每日构建版"),
+                _ => channel.DisplayName,
+            };
+            channel.Description = channel.Channel switch
+            {
+                ReleaseChannel.Release => L("Channel_Release_Desc", "稳定发布版本，推荐大多数用户使用"),
+                ReleaseChannel.PreRelease => L("Channel_PreRelease_Desc", "预发布版本，包含即将发布的最新功能"),
+                ReleaseChannel.Beta => L("Channel_Beta_Desc", "测试版本，可能存在不稳定因素"),
+                ReleaseChannel.Nightly => L("Channel_Nightly_Desc", "每日构建版本，包含最新的开发代码"),
+                _ => channel.Description,
+            };
+        }
+        OnPropertyChanged(nameof(AvailableChannels));
+    }
 
     /// <summary>
     /// <para>退出前清理临时文件。</para>
@@ -615,7 +710,7 @@ public partial class MainWindowViewModel : ViewModelBase
         IsLoadingMirrors = true;
         try
         {
-            var patchData = await _releaseApiService.GetPatchDataAsync();
+            var patchData = await _releaseApiService.GetPatchDataAsync(SelectedChannel?.Channel ?? ReleaseChannel.Release);
             PatchVersion = patchData.Version;
             PatchSha256 = patchData.Sha256;
             Mirrors = new ObservableCollection<GenericPatchPackageMirror>(patchData.Mirrors);

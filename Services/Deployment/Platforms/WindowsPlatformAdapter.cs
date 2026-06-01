@@ -26,7 +26,8 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
     /// </returns>
     public string GetDefaultInstallDirectory(string appName)
     {
-        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        var programFiles = Environment.GetEnvironmentVariable("ProgramW6432")
+            ?? Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
         return Path.Combine(programFiles, appName);
     }
 
@@ -264,6 +265,18 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
     /// </summary>
     public string GetTempDirectory() => Path.GetTempPath();
 
+    /// <summary>
+    /// <para>在指定安装目录中查找应用程序的可执行文件路径。优先搜索匹配 "UotanToolbox*.exe" 模式的文件，若未找到则搜索目录下所有 .exe 文件。</para>
+    /// Finds the application executable file path in the specified installation directory. Searches for files matching the "UotanToolbox*.exe" pattern first, then falls back to all .exe files in the directory.
+    /// </summary>
+    /// <param name="installPath">
+    /// <para>安装目录路径。</para>
+    /// The installation directory path.
+    /// </param>
+    /// <returns>
+    /// <para>表示异步操作的任务，结果为可执行文件路径；若未找到则返回 null。</para>
+    /// A task representing the asynchronous operation, with the result being the executable file path; or null if not found.
+    /// </returns>
     public Task<string?> FindExecutableAsync(string installPath)
     {
         return Task.Run(() =>
@@ -278,6 +291,18 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
         });
     }
 
+    /// <summary>
+    /// <para>使用 Windows 资源管理器打开指定目录。</para>
+    /// Opens the specified directory using Windows File Explorer.
+    /// </summary>
+    /// <param name="path">
+    /// <para>要打开的目录路径。</para>
+    /// The directory path to open.
+    /// </param>
+    /// <returns>
+    /// <para>表示异步操作的 Task。</para>
+    /// A task representing the asynchronous operation.
+    /// </returns>
     public Task OpenInFileExplorerAsync(string path)
     {
         return Task.Run(() =>
@@ -306,8 +331,9 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
             System.Diagnostics.Process.Start(psi);
             return;
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"ShellExecute fallback: UseShellExecute=true failed for '{programPath}': {ex.Message}");
         }
 
         var sei = new SHELLEXECUTEINFOW
@@ -323,6 +349,9 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
 
         if (!ShellExecuteExW(ref sei))
         {
+            var shellError = Marshal.GetLastWin32Error();
+            System.Diagnostics.Debug.WriteLine($"ShellExecute fallback: ShellExecuteExW failed for '{programPath}' with Win32 error {shellError}");
+
             try
             {
                 var psi = new System.Diagnostics.ProcessStartInfo
@@ -337,7 +366,8 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
             }
             catch (Exception ex)
             {
-                throw new Win32Exception(Marshal.GetLastWin32Error(), ex.Message);
+                System.Diagnostics.Debug.WriteLine($"ShellExecute fallback: UseShellExecute=false failed for '{programPath}': {ex.Message}");
+                throw new Win32Exception(shellError, ex.Message);
             }
         }
 

@@ -78,9 +78,11 @@ public sealed class LinuxPlatformAdapter : IPlatformAdapter
             content.AppendLine(execLine);
             content.AppendLine($"Icon={appName}");
             content.AppendLine("Terminal=false");
-            content.AppendLine("Categories=Utility;");
+            content.AppendLine("StartupNotify=true");
+            content.AppendLine($"StartupWMClass={appName}");
+            content.AppendLine("Categories=Utility;Development;");
 
-            File.WriteAllText(desktopFilePath, content.ToString());
+            File.WriteAllText(desktopFilePath, content.ToString(), Encoding.UTF8);
 
             var chmodPsi = new ProcessStartInfo
             {
@@ -102,7 +104,7 @@ public sealed class LinuxPlatformAdapter : IPlatformAdapter
             var appDesktopFilePath = Path.Combine(applicationsDir, $"{appName}.desktop");
             try
             {
-                File.WriteAllText(appDesktopFilePath, content.ToString());
+                File.WriteAllText(appDesktopFilePath, content.ToString(), Encoding.UTF8);
                 var chmodAppPsi = new ProcessStartInfo
                 {
                     FileName = "chmod",
@@ -112,8 +114,9 @@ public sealed class LinuxPlatformAdapter : IPlatformAdapter
                 using var chmodAppProcess = Process.Start(chmodAppPsi);
                 chmodAppProcess?.WaitForExit();
             }
-            catch
+            catch (Exception ex)
             {
+                Debug.WriteLine($"Failed to write .desktop file to applications directory: {ex}");
             }
 
             try
@@ -127,8 +130,9 @@ public sealed class LinuxPlatformAdapter : IPlatformAdapter
                 using var updateDbProcess = Process.Start(updateDbPsi);
                 updateDbProcess?.WaitForExit();
             }
-            catch
+            catch (Exception ex)
             {
+                Debug.WriteLine($"Failed to update desktop database: {ex}");
             }
         }, ct);
     }
@@ -165,8 +169,9 @@ public sealed class LinuxPlatformAdapter : IPlatformAdapter
             using var chmodProcess = Process.Start(chmodPsi);
             chmodProcess?.WaitForExit();
         }
-        catch
+        catch (Exception ex)
         {
+            Debug.WriteLine($"Failed to set executable permission on '{exePath}': {ex}");
         }
 
         var psi = new ProcessStartInfo
@@ -246,8 +251,9 @@ public sealed class LinuxPlatformAdapter : IPlatformAdapter
             var result = process.StandardOutput.ReadLine();
             return string.IsNullOrWhiteSpace(result) ? null : result.Trim();
         }
-        catch
+        catch (Exception ex)
         {
+            Debug.WriteLine($"Failed to find executable '{name}' on PATH: {ex}");
             return null;
         }
     }
@@ -262,6 +268,18 @@ public sealed class LinuxPlatformAdapter : IPlatformAdapter
     /// </returns>
     public string GetTempDirectory() => Path.GetTempPath();
 
+    /// <summary>
+    /// <para>在指定安装目录中查找应用程序的可执行文件路径。优先查找包含 "UotanToolbox" 的无扩展名可执行文件，其次查找任意无扩展名可执行文件。</para>
+    /// Finds the application executable file path in the specified installation directory. Prioritizes extensionless executables containing "UotanToolbox", then falls back to any extensionless executable.
+    /// </summary>
+    /// <param name="installPath">
+    /// <para>安装目录路径。</para>
+    /// The installation directory path.
+    /// </param>
+    /// <returns>
+    /// <para>表示异步操作的任务，结果为可执行文件路径；若未找到则返回 null。</para>
+    /// A task representing the asynchronous operation, with the result being the executable file path; or null if not found.
+    /// </returns>
     public Task<string?> FindExecutableAsync(string installPath)
     {
         return Task.Run(() =>
@@ -289,14 +307,27 @@ public sealed class LinuxPlatformAdapter : IPlatformAdapter
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                Debug.WriteLine($"Failed to find executable in '{installPath}': {ex}");
             }
 
             return null;
         });
     }
 
+    /// <summary>
+    /// <para>使用系统文件管理器打开指定目录。</para>
+    /// Opens the specified directory using the system file explorer.
+    /// </summary>
+    /// <param name="path">
+    /// <para>要打开的目录路径。</para>
+    /// The directory path to open.
+    /// </param>
+    /// <returns>
+    /// <para>表示异步操作的 Task。</para>
+    /// A task representing the asynchronous operation.
+    /// </returns>
     public Task OpenInFileExplorerAsync(string path)
     {
         return Task.Run(() =>
@@ -311,6 +342,18 @@ public sealed class LinuxPlatformAdapter : IPlatformAdapter
         });
     }
 
+    /// <summary>
+    /// <para>检查指定文件是否具有可执行权限，通过调用 Linux test -x 命令判断。</para>
+    /// Checks whether the specified file has execute permission by invoking the Linux test -x command.
+    /// </summary>
+    /// <param name="filePath">
+    /// <para>要检查的文件路径。</para>
+    /// The file path to check.
+    /// </param>
+    /// <returns>
+    /// <para>若文件具有可执行权限则返回 true；否则返回 false。</para>
+    /// true if the file has execute permission; otherwise, false.
+    /// </returns>
     private static bool IsExecutable(string filePath)
     {
         try
@@ -325,8 +368,9 @@ public sealed class LinuxPlatformAdapter : IPlatformAdapter
             process?.WaitForExit();
             return process?.ExitCode == 0;
         }
-        catch
+        catch (Exception ex)
         {
+            Debug.WriteLine($"Failed to check executable permission for '{filePath}': {ex}");
             return false;
         }
     }

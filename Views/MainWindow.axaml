@@ -84,6 +84,21 @@
                     Content="{Binding AgreeEulaText}"
                     Margin="0,4,0,8" />
 
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+            <TextBlock Text="{Binding ChannelLabelText}" VerticalAlignment="Center" />
+            <ComboBox ItemsSource="{Binding AvailableChannels}"
+                      SelectedItem="{Binding SelectedChannel}"
+                      DisplayMemberBinding="{Binding DisplayName}"
+                      MinWidth="200" />
+          </StackPanel>
+
+          <StackPanel IsVisible="{Binding IsChannelWarningVisible}" Margin="0,4,0,0">
+            <TextBlock Text="{Binding ChannelWarningText}"
+                       Foreground="Orange"
+                       TextWrapping="Wrap"
+                       FontSize="12" />
+          </StackPanel>
+
           <StackPanel Classes="button-row">
             <Button Classes="accent"
                     Content="{Binding StartText}"

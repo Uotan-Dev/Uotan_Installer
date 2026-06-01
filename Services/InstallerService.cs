@@ -23,6 +23,7 @@ public sealed class InstallerService : IInstallerService
     private readonly IPlatformAdapter _platformAdapter;
     private readonly ILocalizationService _localizationService;
     private readonly IGitHubMirrorService _gitHubMirrorService;
+    private readonly IChannelService _channelService;
 
     /// <summary>
     /// <para>初始化 InstallerService 实例</para>
@@ -68,6 +69,10 @@ public sealed class InstallerService : IInstallerService
     /// <para>GitHub 镜像服务</para>
     /// The GitHub mirror service
     /// </param>
+    /// <param name="channelService">
+    /// <para>发布渠道服务</para>
+    /// The channel service
+    /// </param>
     public InstallerService(
         IReleaseApiService releaseApiService,
         IFileService fileService,
@@ -78,7 +83,8 @@ public sealed class InstallerService : IInstallerService
         IPlatformDetector platformDetector,
         IPlatformAdapter platformAdapter,
         ILocalizationService localizationService,
-        IGitHubMirrorService gitHubMirrorService)
+        IGitHubMirrorService gitHubMirrorService,
+        IChannelService channelService)
     {
         _releaseApiService = releaseApiService;
         _fileService = fileService;
@@ -90,6 +96,7 @@ public sealed class InstallerService : IInstallerService
         _platformAdapter = platformAdapter;
         _localizationService = localizationService;
         _gitHubMirrorService = gitHubMirrorService;
+        _channelService = channelService;
     }
 
     /// <inheritdoc/>
@@ -99,6 +106,8 @@ public sealed class InstallerService : IInstallerService
         var currVersion = await TryGetInstalledVersionAsync(installDir).ConfigureAwait(false);
         var isUpdate = currVersion is not null;
 
+        var channelInfo = await _channelService.GetChannelInfoAsync(ReleaseChannel.Release, cancellationToken).ConfigureAwait(false);
+
         var config = new InstallerConfig
         {
             Version = GetCurrentVersion(),
@@ -106,6 +115,8 @@ public sealed class InstallerService : IInstallerService
             IsOfflineMode = false,
             CurrVersion = currVersion,
             InstallPath = installDir,
+            Channel = ReleaseChannel.Release,
+            ChannelDisplayName = channelInfo.DisplayName,
         };
 
         return config;
@@ -165,7 +176,7 @@ public sealed class InstallerService : IInstallerService
     /// <inheritdoc/>
     public async Task SelfUpdateAsync(IProgress<(long Downloaded, long Total)>? downloadProgress = null, CancellationToken cancellationToken = default)
     {
-        var hasUpdate = await _releaseApiService.CheckSelfUpdateAsync(GetCurrentVersion(), cancellationToken).ConfigureAwait(false);
+        var hasUpdate = await _releaseApiService.CheckSelfUpdateAsync(GetCurrentVersion(), ReleaseChannel.Release, cancellationToken).ConfigureAwait(false);
         if (!hasUpdate) return;
 
         var client = _httpService.Client;

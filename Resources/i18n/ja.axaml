@@ -67,4 +67,14 @@
   <s:String x:Key="RetryLimitReached">再試行回数が上限に達しました。ネットワーク接続を確認するか、サポートにお問い合わせください。</s:String>
   <s:String x:Key="SelfUpdateConfirm">新しいバージョンが利用可能です。今すぐ更新しますか？</s:String>
   <s:String x:Key="SelectInstallPath">インストールパスを選択</s:String>
+  <s:String x:Key="ChannelLabel">リリースチャンネル</s:String>
+  <s:String x:Key="Channel_Release">リリース</s:String>
+  <s:String x:Key="Channel_PreRelease">プレリリース</s:String>
+  <s:String x:Key="Channel_Beta">ベータ</s:String>
+  <s:String x:Key="Channel_Nightly">ナイトリー</s:String>
+  <s:String x:Key="Channel_Release_Desc">安定版リリース、ほとんどのユーザーに推奨</s:String>
+  <s:String x:Key="Channel_PreRelease_Desc">近日公開の機能を含むプレリリース版</s:String>
+  <s:String x:Key="Channel_Beta_Desc">ベータ版、不安定な場合があります</s:String>
+  <s:String x:Key="Channel_Nightly_Desc">最新の開発コードを含むナイトリービルド</s:String>
+  <s:String x:Key="Channel_Warning">このチャンネルは不安定な場合があり、テスト目的のみです。本番環境ではリリース版をご使用ください。</s:String>
 </ResourceDictionary>

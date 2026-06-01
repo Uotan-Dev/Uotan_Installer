@@ -67,4 +67,14 @@
   <s:String x:Key="RetryLimitReached">多次重试失败，请检查网络连接或联系支持。</s:String>
   <s:String x:Key="SelfUpdateConfirm">检测到新版本，是否立即更新？</s:String>
   <s:String x:Key="SelectInstallPath">选择安装路径</s:String>
+  <s:String x:Key="ChannelLabel">发布渠道</s:String>
+  <s:String x:Key="Channel_Release">正式版</s:String>
+  <s:String x:Key="Channel_PreRelease">预发布版</s:String>
+  <s:String x:Key="Channel_Beta">测试版</s:String>
+  <s:String x:Key="Channel_Nightly">每日构建版</s:String>
+  <s:String x:Key="Channel_Release_Desc">稳定发布版本，推荐大多数用户使用</s:String>
+  <s:String x:Key="Channel_PreRelease_Desc">预发布版本，包含即将发布的最新功能</s:String>
+  <s:String x:Key="Channel_Beta_Desc">测试版本，可能存在不稳定因素</s:String>
+  <s:String x:Key="Channel_Nightly_Desc">每日构建版本，包含最新的开发代码</s:String>
+  <s:String x:Key="Channel_Warning">此渠道版本可能不稳定，仅建议测试用途。生产环境请使用正式版。</s:String>
 </ResourceDictionary>

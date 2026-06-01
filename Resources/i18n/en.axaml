@@ -67,4 +67,14 @@
   <s:String x:Key="RetryLimitReached">Multiple retries failed. Please check your network connection or contact support.</s:String>
   <s:String x:Key="SelfUpdateConfirm">A new version is available. Would you like to update now?</s:String>
   <s:String x:Key="SelectInstallPath">Select Install Path</s:String>
+  <s:String x:Key="ChannelLabel">Release Channel</s:String>
+  <s:String x:Key="Channel_Release">Release</s:String>
+  <s:String x:Key="Channel_PreRelease">Pre-Release</s:String>
+  <s:String x:Key="Channel_Beta">Beta</s:String>
+  <s:String x:Key="Channel_Nightly">Nightly</s:String>
+  <s:String x:Key="Channel_Release_Desc">Stable release, recommended for most users</s:String>
+  <s:String x:Key="Channel_PreRelease_Desc">Pre-release version with upcoming features</s:String>
+  <s:String x:Key="Channel_Beta_Desc">Beta version, may be unstable</s:String>
+  <s:String x:Key="Channel_Nightly_Desc">Nightly build with the latest development code</s:String>
+  <s:String x:Key="Channel_Warning">This channel may be unstable and is intended for testing only. Use Release for production.</s:String>
 </ResourceDictionary>

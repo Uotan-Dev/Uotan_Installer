@@ -68,6 +68,18 @@ public sealed class InstallerConfig
     /// Gets or sets the installation path.
     /// </summary>
     public string InstallPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// <para>获取或设置发布渠道类型。</para>
+    /// Gets or sets the release channel type.
+    /// </summary>
+    public ReleaseChannel Channel { get; set; } = ReleaseChannel.Release;
+
+    /// <summary>
+    /// <para>获取或设置渠道的本地化显示名称。</para>
+    /// Gets or sets the localized display name of the channel.
+    /// </summary>
+    public string ChannelDisplayName { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -198,6 +210,12 @@ public sealed class GitHubRelease
 
     [JsonPropertyName("assets")]
     public List<GitHubReleaseAsset>? Assets { get; set; }
+
+    [JsonPropertyName("prerelease")]
+    public bool Prerelease { get; set; }
+
+    [JsonPropertyName("draft")]
+    public bool Draft { get; set; }
 }
 
 /// <summary>
@@ -217,4 +235,78 @@ public sealed class GitHubReleaseAsset
 
     [JsonPropertyName("digest")]
     public string? Digest { get; set; }
+}
+
+/// <summary>
+/// <para>表示发布渠道的类型。</para>
+/// Represents the type of release channel.
+/// </summary>
+public enum ReleaseChannel
+{
+    /// <summary>
+    /// <para>正式版渠道，从 GitHub latest release 获取稳定发布版本。</para>
+    /// Release channel, fetching stable release versions from GitHub latest release.
+    /// </summary>
+    Release = 0,
+
+    /// <summary>
+    /// <para>预发布版渠道，从 GitHub prerelease releases 获取预发布版本。</para>
+    /// Pre-release channel, fetching pre-release versions from GitHub prerelease releases.
+    /// </summary>
+    PreRelease = 1,
+
+    /// <summary>
+    /// <para>测试版渠道，从指定 beta tag 获取测试版本。</para>
+    /// Beta channel, fetching beta versions from the specified beta tag.
+    /// </summary>
+    Beta = 2,
+
+    /// <summary>
+    /// <para>每日构建版渠道，从指定 nightly tag 获取每日构建版本。</para>
+    /// Nightly channel, fetching nightly build versions from the specified nightly tag.
+    /// </summary>
+    Nightly = 3,
+}
+
+/// <summary>
+/// <para>表示发布渠道的详细配置信息。</para>
+/// Represents detailed configuration information for a release channel.
+/// </summary>
+public sealed class ReleaseChannelInfo
+{
+    /// <summary>
+    /// <para>获取或设置渠道类型。</para>
+    /// Gets or sets the channel type.
+    /// </summary>
+    public ReleaseChannel Channel { get; set; }
+
+    /// <summary>
+    /// <para>获取或设置渠道的本地化显示名称。</para>
+    /// Gets or sets the localized display name of the channel.
+    /// </summary>
+    public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// <para>获取或设置渠道的本地化描述。</para>
+    /// Gets or sets the localized description of the channel.
+    /// </summary>
+    public string Description { get; set; } = string.Empty;
+
+    /// <summary>
+    /// <para>获取或设置渠道对应的 API 查询端点相对路径。</para>
+    /// Gets or sets the relative API endpoint path for the channel.
+    /// </summary>
+    public string ApiEndpoint { get; set; } = string.Empty;
+
+    /// <summary>
+    /// <para>获取或设置当前渠道是否可用。</para>
+    /// Gets or sets whether the channel is currently available.
+    /// </summary>
+    public bool IsAvailable { get; set; } = true;
+
+    /// <summary>
+    /// <para>获取或设置渠道的稳定性等级（1-4，1最稳定）。</para>
+    /// Gets or sets the stability level of the channel (1-4, 1 being the most stable).
+    /// </summary>
+    public int StabilityLevel { get; set; } = 1;
 }

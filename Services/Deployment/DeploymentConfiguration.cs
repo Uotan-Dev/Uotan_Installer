@@ -1,5 +1,7 @@
 namespace UotanInstaller.App.Services.Deployment;
 
+using UotanInstaller.App.Models;
+
 /// <summary>
 /// <para>封装部署流程的完整配置信息。</para>
 /// Encapsulates the complete configuration for the deployment process.
@@ -71,4 +73,10 @@ public sealed class DeploymentConfiguration
     /// Gets or initializes the SHA256 checksum of the package; null to skip verification.
     /// </summary>
     public string? Sha256 { get; init; }
+
+    /// <summary>
+    /// <para>获取或初始化发布渠道类型，默认为正式版。</para>
+    /// Gets or initializes the release channel type; defaults to Release.
+    /// </summary>
+    public ReleaseChannel Channel { get; init; } = ReleaseChannel.Release;
 }

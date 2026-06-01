@@ -27,6 +27,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<IGitHubMirrorService, GitHubMirrorService>();
         services.AddSingleton<IHttpService, HttpService>();
+        services.AddSingleton<IChannelService, ChannelService>();
         services.AddSingleton<IReleaseApiService, ReleaseApiService>();
         services.AddSingleton<IProcessService, ProcessService>();
         services.AddSingleton<IFileService, FileService>();

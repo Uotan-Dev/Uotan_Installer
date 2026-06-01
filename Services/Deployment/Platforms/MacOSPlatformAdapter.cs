@@ -75,25 +75,30 @@ public sealed class MacOSPlatformAdapter : IPlatformAdapter
                     else
                         File.Delete(aliasPath);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Debug.WriteLine($"Failed to delete existing alias '{aliasPath}': {ex.Message}");
                 }
             }
 
-            var escapedTarget = targetPath.Replace("\\", "\\\\").Replace("\"", "\\\"");
-            var escapedAlias = aliasPath.Replace("\\", "\\\\").Replace("\"", "\\\"");
-            var script = $"tell application \"Finder\" to make alias file to (POSIX file \"{escapedTarget}\") at (POSIX file \"{Path.GetDirectoryName(aliasPath)}/\")";
+            var escapedTarget = EscapeAppleScriptString(targetPath);
+            var aliasDir = Path.GetDirectoryName(aliasPath) ?? desktopDir;
+            var escapedDir = EscapeAppleScriptString(aliasDir);
+            var script = $"tell application \"Finder\" to make alias file to (POSIX file \"{escapedTarget}\") at (POSIX file \"{escapedDir}/\")";
 
             var psi = new ProcessStartInfo
             {
                 FileName = "osascript",
-                Arguments = $"-e '{script.Replace("'", "'\\''")}'",
                 UseShellExecute = false,
+                RedirectStandardInput = true,
                 RedirectStandardError = true,
             };
 
             using var process = Process.Start(psi)
                 ?? throw new DeploymentException($"Failed to create alias from '{targetPath}' to '{aliasPath}'.");
+
+            process.StandardInput.WriteLine(script);
+            process.StandardInput.Close();
             process.WaitForExit();
 
             if (process.ExitCode != 0)
@@ -131,8 +136,8 @@ public sealed class MacOSPlatformAdapter : IPlatformAdapter
     }
 
     /// <summary>
-    /// <para>使用 osascript 以管理员权限启动指定程序，将弹出 macOS 授权对话框。</para>
-    /// Launches the specified program with administrator privileges using osascript, which will display a macOS authorization dialog.
+    /// <para>使用 osascript 以管理员权限启动指定程序，将弹出 macOS 授权对话框。通过 stdin 管道传递 AppleScript 脚本，避免多层 shell 转义。</para>
+    /// Launches the specified program with administrator privileges using osascript, which will display a macOS authorization dialog. The AppleScript is passed via stdin pipe to avoid multi-layer shell escaping.
     /// </summary>
     /// <param name="exePath">
     /// <para>可执行文件的路径。</para>
@@ -144,19 +149,31 @@ public sealed class MacOSPlatformAdapter : IPlatformAdapter
     /// </param>
     public void RequestElevation(string exePath, string? args = null)
     {
-        var escapedPath = exePath.Replace("\\", "\\\\").Replace("\"", "\\\"");
-        var scriptArgs = string.IsNullOrEmpty(args)
-            ? $"\"do shell script \\\"\\\\\\\"{escapedPath}\\\\\\\"\\\" with administrator privileges\""
-            : $"\"do shell script \\\"\\\\\\\"{escapedPath}\\\\\\\" {args.Replace("\"", "\\\\\\\"")}\\\" with administrator privileges\"";
+        var escapedPath = EscapeAppleScriptString(exePath);
+        string script;
+        if (string.IsNullOrEmpty(args))
+        {
+            script = $"set exePath to \"{escapedPath}\"\ndo shell script (quoted form of exePath) with administrator privileges";
+        }
+        else
+        {
+            var escapedArgs = EscapeAppleScriptString(args);
+            script = $"set exePath to \"{escapedPath}\"\ndo shell script (quoted form of exePath) & space & \"{escapedArgs}\" with administrator privileges";
+        }
 
         var psi = new ProcessStartInfo
         {
             FileName = "osascript",
-            Arguments = $"-e {scriptArgs}",
             UseShellExecute = false,
+            RedirectStandardInput = true,
         };
 
-        Process.Start(psi)?.Dispose();
+        var process = Process.Start(psi);
+        if (process is null) return;
+
+        process.StandardInput.WriteLine(script);
+        process.StandardInput.Close();
+        process.Dispose();
     }
 
     /// <summary>
@@ -169,6 +186,18 @@ public sealed class MacOSPlatformAdapter : IPlatformAdapter
     /// </returns>
     public string GetTempDirectory() => Path.GetTempPath();
 
+    /// <summary>
+    /// <para>在指定安装目录中查找应用程序的可执行文件路径。优先检查 .app 包的 Contents/MacOS 目录，然后检查根目录中的无扩展名文件。</para>
+    /// Finds the application executable file path in the specified installation directory. Checks the .app bundle's Contents/MacOS directory first, then checks for extensionless files in the root directory.
+    /// </summary>
+    /// <param name="installPath">
+    /// <para>安装目录路径。</para>
+    /// The installation directory path.
+    /// </param>
+    /// <returns>
+    /// <para>表示异步操作的任务，结果为可执行文件路径；若未找到则返回 null。</para>
+    /// A task representing the asynchronous operation, with the result being the executable file path; or null if not found.
+    /// </returns>
     public Task<string?> FindExecutableAsync(string installPath)
     {
         return Task.Run(() =>
@@ -192,14 +221,27 @@ public sealed class MacOSPlatformAdapter : IPlatformAdapter
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                Debug.WriteLine($"Failed to enumerate files in '{installPath}': {ex.Message}");
             }
 
             return null;
         });
     }
 
+    /// <summary>
+    /// <para>使用 macOS Finder 打开指定目录。</para>
+    /// Opens the specified directory using macOS Finder.
+    /// </summary>
+    /// <param name="path">
+    /// <para>要打开的目录路径。</para>
+    /// The directory path to open.
+    /// </param>
+    /// <returns>
+    /// <para>表示异步操作的 Task。</para>
+    /// A task representing the asynchronous operation.
+    /// </returns>
     public Task OpenInFileExplorerAsync(string path)
     {
         return Task.Run(() =>
@@ -212,5 +254,10 @@ public sealed class MacOSPlatformAdapter : IPlatformAdapter
             };
             Process.Start(psi)?.Dispose();
         });
+    }
+
+    private static string EscapeAppleScriptString(string value)
+    {
+        return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
     }
 }
