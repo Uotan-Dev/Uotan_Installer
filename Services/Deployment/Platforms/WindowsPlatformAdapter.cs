@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using System.Text;
 
 namespace UotanInstaller.App.Services.Deployment.Platforms;
 
@@ -32,8 +31,8 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
     }
 
     /// <summary>
-    /// <para>在 Windows 桌面创建应用程序快捷方式（.lnk 文件），直接写入 Shell Link 二进制格式，无需 COM 互操作。</para>
-    /// Creates an application shortcut (.lnk file) on the Windows desktop by writing the Shell Link binary format directly, without COM interop.
+    /// <para>在 Windows 桌面创建应用程序快捷方式（.lnk 文件），使用 IWshRuntimeLibrary（Windows Script Host Object Model）COM 组件实现。</para>
+    /// Creates an application shortcut (.lnk file) on the Windows desktop using the IWshRuntimeLibrary (Windows Script Host Object Model) COM component.
     /// </summary>
     /// <param name="appName">
     /// <para>应用程序名称，用作快捷方式文件名。</para>
@@ -64,181 +63,15 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
             var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             var lnkPath = Path.Combine(desktopPath, $"{appName}.lnk");
 
-            WriteShortcutBinary(lnkPath, targetPath, args ?? string.Empty, Path.GetDirectoryName(targetPath) ?? string.Empty);
+            var shell = new IWshRuntimeLibrary.WshShell();
+            var shortcut = (IWshRuntimeLibrary.IWshShortcut)shell.CreateShortcut(lnkPath);
+            shortcut.TargetPath = targetPath;
+            shortcut.WorkingDirectory = Path.GetDirectoryName(targetPath) ?? string.Empty;
+            shortcut.WindowStyle = 1;
+            if (!string.IsNullOrEmpty(args))
+                shortcut.Arguments = args;
+            shortcut.Save();
         }, ct);
-    }
-
-    /// <summary>
-    /// <para>直接写入 Shell Link (.lnk) 二进制文件格式，使用 ILCreateFromPathW P/Invoke 获取 PIDL，完全避免 COM 互操作。</para>
-    /// Writes the Shell Link (.lnk) binary file format directly, using ILCreateFromPathW P/Invoke to obtain the PIDL, completely avoiding COM interop.
-    /// </summary>
-    /// <param name="shortcutPath">
-    /// <para>快捷方式文件的完整路径。</para>
-    /// The full path of the shortcut file.
-    /// </param>
-    /// <param name="targetPath">
-    /// <para>目标可执行文件路径。</para>
-    /// The target executable file path.
-    /// </param>
-    /// <param name="arguments">
-    /// <para>命令行参数。</para>
-    /// The command-line arguments.
-    /// </param>
-    /// <param name="workingDirectory">
-    /// <para>工作目录。</para>
-    /// The working directory.
-    /// </param>
-    private static void WriteShortcutBinary(string shortcutPath, string targetPath, string arguments, string workingDirectory)
-    {
-        var pidl = ILCreateFromPathW(targetPath);
-
-        if (pidl == IntPtr.Zero)
-        {
-            WriteShortcutWithExpString(shortcutPath, targetPath, arguments, workingDirectory);
-            return;
-        }
-
-        try
-        {
-            uint linkFlags = LinkFlags.HasLinkTargetIDList
-                           | LinkFlags.IsUnicode
-                           | LinkFlags.HasWorkingDir;
-
-            if (!string.IsNullOrEmpty(arguments))
-                linkFlags |= LinkFlags.HasArguments;
-
-            using var stream = new FileStream(shortcutPath, FileMode.Create, FileAccess.Write);
-            using var writer = new BinaryWriter(stream);
-
-            WriteShellLinkHeader(writer, linkFlags);
-            WriteLinkTargetIdList(writer, pidl);
-
-            WriteUnicodeStringData(writer, workingDirectory);
-            if (!string.IsNullOrEmpty(arguments))
-                WriteUnicodeStringData(writer, arguments);
-
-            writer.Write(0u);
-        }
-        finally
-        {
-            ILFree(pidl);
-        }
-    }
-
-    /// <summary>
-    /// <para>当 ILCreateFromPathW 失败时，使用 EnvironmentVariableDataBlock 写入 .lnk 文件作为降级方案。</para>
-    /// When ILCreateFromPathW fails, writes a .lnk file using the EnvironmentVariableDataBlock as a fallback.
-    /// </summary>
-    private static void WriteShortcutWithExpString(string shortcutPath, string targetPath, string arguments, string workingDirectory)
-    {
-        uint linkFlags = LinkFlags.IsUnicode
-                       | LinkFlags.HasWorkingDir
-                       | LinkFlags.HasExpString;
-
-        if (!string.IsNullOrEmpty(arguments))
-            linkFlags |= LinkFlags.HasArguments;
-
-        using var stream = new FileStream(shortcutPath, FileMode.Create, FileAccess.Write);
-        using var writer = new BinaryWriter(stream);
-
-        WriteShellLinkHeader(writer, linkFlags);
-
-        WriteUnicodeStringData(writer, workingDirectory);
-        if (!string.IsNullOrEmpty(arguments))
-            WriteUnicodeStringData(writer, arguments);
-
-        WriteEnvironmentVariableBlock(writer, targetPath);
-
-        writer.Write(0u);
-    }
-
-    /// <summary>
-    /// <para>写入 ShellLinkHeader 结构（76 字节）。</para>
-    /// Writes the ShellLinkHeader structure (76 bytes).
-    /// </summary>
-    private static void WriteShellLinkHeader(BinaryWriter writer, uint linkFlags)
-    {
-        writer.Write(0x4Cu);
-        writer.Write(ShellLinkCLSID.ToByteArrayLe());
-        writer.Write(linkFlags);
-        writer.Write(0x20u);
-        writer.Write(0L);
-        writer.Write(0L);
-        writer.Write(0L);
-        writer.Write(0u);
-        writer.Write(0);
-        writer.Write(1);
-        writer.Write((ushort)0);
-        writer.Write((ushort)0);
-        writer.Write(0u);
-        writer.Write(0u);
-    }
-
-    /// <summary>
-    /// <para>写入 LinkTargetIDList 结构，包含从 ILCreateFromPathW 获取的 PIDL。</para>
-    /// Writes the LinkTargetIDList structure containing the PIDL obtained from ILCreateFromPathW.
-    /// </summary>
-    private static void WriteLinkTargetIdList(BinaryWriter writer, IntPtr pidl)
-    {
-        int idListDataSize = 0;
-        var current = pidl;
-        while (true)
-        {
-            var cb = Marshal.ReadInt16(current);
-            if (cb == 0) break;
-            idListDataSize += cb;
-            current = IntPtr.Add(current, cb);
-        }
-
-        var idListSize = (ushort)(idListDataSize + 2);
-        writer.Write(idListSize);
-
-        current = pidl;
-        while (true)
-        {
-            var cb = Marshal.ReadInt16(current);
-            if (cb == 0) break;
-            var bytes = new byte[cb];
-            Marshal.Copy(current, bytes, 0, cb);
-            writer.Write(bytes);
-            current = IntPtr.Add(current, cb);
-        }
-
-        writer.Write((ushort)0);
-    }
-
-    /// <summary>
-    /// <para>写入 Unicode 字符串数据段（字符计数 + UTF-16LE 编码字符串 + 空终止符）。</para>
-    /// Writes a Unicode string data section (character count + UTF-16LE encoded string + null terminator).
-    /// </summary>
-    private static void WriteUnicodeStringData(BinaryWriter writer, string value)
-    {
-        var charCount = (ushort)(value.Length + 1);
-        writer.Write(charCount);
-        writer.Write(Encoding.Unicode.GetBytes(value));
-        writer.Write((ushort)0);
-    }
-
-    /// <summary>
-    /// <para>写入 EnvironmentVariableDataBlock（签名 0xA0000001），包含目标路径的 ANSI 和 Unicode 表示。</para>
-    /// Writes the EnvironmentVariableDataBlock (signature 0xA0000001) containing the target path in both ANSI and Unicode representations.
-    /// </summary>
-    private static void WriteEnvironmentVariableBlock(BinaryWriter writer, string targetPath)
-    {
-        var ansiBuffer = new byte[260];
-        var unicodeBuffer = new byte[520];
-
-        var ansiBytes = Encoding.Default.GetBytes(targetPath);
-        Array.Copy(ansiBytes, 0, ansiBuffer, 0, Math.Min(ansiBytes.Length, 259));
-
-        var unicodeBytes = Encoding.Unicode.GetBytes(targetPath);
-        Array.Copy(unicodeBytes, 0, unicodeBuffer, 0, Math.Min(unicodeBytes.Length, 518));
-
-        uint blockSize = 4 + 4 + 260 + 520;
-        writer.Write(blockSize);
-        writer.Write(0xA0000001u);
-        writer.Write(ansiBuffer);
-        writer.Write(unicodeBuffer);
     }
 
     /// <summary>
@@ -317,6 +150,147 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
         });
     }
 
+    /// <summary>
+    /// <para>异步注册 URL 协议处理器。</para>
+    /// Asynchronously registers a URL protocol handler.
+    /// </summary>
+    public Task RegisterProtocolHandlerAsync(string scheme, string exePath, CancellationToken ct)
+    {
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey($"SOFTWARE\\Classes\\{scheme}");
+            key.SetValue(string.Empty, $"URL:{scheme} Protocol");
+            key.SetValue("URL Protocol", string.Empty);
+            var shellKey = key.CreateSubKey("shell\\open\\command");
+            shellKey.SetValue(string.Empty, $"\"{exePath}\" \"%1\"");
+            shellKey.Dispose();
+            key.Dispose();
+        }, ct);
+    }
+
+    /// <summary>
+    /// <para>异步将指定目录添加到系统 PATH 环境变量。</para>
+    /// Asynchronously adds the specified directory to the system PATH environment variable.
+    /// </summary>
+    public Task AddToSystemPathAsync(string directory, CancellationToken ct)
+    {
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var envKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Environment", writable: true);
+            if (envKey is null) return;
+
+            var pathValue = (string?)envKey.GetValue("Path", string.Empty);
+            var paths = (pathValue ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries);
+            if (paths.Contains(directory, StringComparer.OrdinalIgnoreCase))
+            {
+                envKey.Close();
+                return;
+            }
+
+            var newPath = string.IsNullOrEmpty(pathValue) ? directory : $"{pathValue};{directory}";
+            envKey.SetValue("Path", newPath);
+            envKey.Close();
+
+            NotifyEnvironmentChange();
+        }, ct);
+    }
+
+    /// <summary>
+    /// <para>异步从系统 PATH 环境变量中移除指定目录。</para>
+    /// Asynchronously removes the specified directory from the system PATH environment variable.
+    /// </summary>
+    public Task RemoveFromSystemPathAsync(string directory, CancellationToken ct)
+    {
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var envKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Environment", writable: true);
+            if (envKey is null) return;
+
+            var pathValue = (string?)envKey.GetValue("Path", null);
+            if (string.IsNullOrEmpty(pathValue))
+            {
+                envKey.Close();
+                return;
+            }
+
+            var paths = pathValue.Split(';', StringSplitOptions.RemoveEmptyEntries)
+                .Where(p => !string.Equals(p, directory, StringComparison.OrdinalIgnoreCase));
+            envKey.SetValue("Path", string.Join(";", paths));
+            envKey.Close();
+
+            NotifyEnvironmentChange();
+        }, ct);
+    }
+
+    /// <summary>
+    /// <para>通过 SendMessageTimeout 广播 WM_SETTINGCHANGE 消息，通知系统环境变量已更新。</para>
+    /// Broadcasts WM_SETTINGCHANGE via SendMessageTimeout to notify the system that environment variables have been updated.
+    /// </summary>
+    private static void NotifyEnvironmentChange()
+    {
+        SendMessageTimeout(
+            (IntPtr)0xFFFF,
+            0x001A,
+            IntPtr.Zero,
+            "Environment",
+            0x0002,
+            5000,
+            out _);
+    }
+
+    /// <summary>
+    /// <para>获取指定应用程序的数据目录路径。</para>
+    /// Gets the data directory path for the specified application.
+    /// </summary>
+    public string GetAppDataDirectory(string appName)
+    {
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        return Path.Combine(appData, appName);
+    }
+
+    /// <summary>
+    /// <para>异步获取指定安装路径中应用程序的已安装版本号。</para>
+    /// Asynchronously gets the installed version number of the application at the specified installation path.
+    /// </summary>
+    public Task<string?> GetInstalledVersionAsync(string installPath)
+    {
+        return Task.Run(() =>
+        {
+            if (!Directory.Exists(installPath)) return null;
+
+            try
+            {
+                var exeFiles = Directory.GetFiles(installPath, "*.exe", SearchOption.TopDirectoryOnly);
+                string? targetExe = null;
+                foreach (var f in exeFiles)
+                {
+                    var name = Path.GetFileNameWithoutExtension(f);
+                    if (name.Length > 0)
+                    {
+                        targetExe = f;
+                        break;
+                    }
+                }
+
+                if (targetExe is null) return null;
+
+                var versionInfo = System.Diagnostics.FileVersionInfo.GetVersionInfo(targetExe);
+                return string.IsNullOrEmpty(versionInfo.ProductVersion) ? null : versionInfo.ProductVersion;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to get installed version: {ex.Message}");
+                return null;
+            }
+        });
+    }
+
     private static void ShellExecute(string programPath, string? args, string verb)
     {
         try
@@ -377,24 +351,7 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
         }
     }
 
-    private static readonly Guid ShellLinkCLSID = new("00021401-0000-0000-C000-000000000046");
-
-    private static class LinkFlags
-    {
-        public const uint HasLinkTargetIDList = 0x00000001;
-        public const uint HasWorkingDir = 0x00000010;
-        public const uint HasArguments = 0x00000020;
-        public const uint IsUnicode = 0x00000080;
-        public const uint HasExpString = 0x00000200;
-    }
-
     #region P/Invoke
-
-    [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern IntPtr ILCreateFromPathW(string pszPath);
-
-    [DllImport("shell32.dll")]
-    private static extern void ILFree(IntPtr pidl);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct SHELLEXECUTEINFOW
@@ -432,14 +389,10 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool CloseHandle(IntPtr hObject);
 
-    #endregion
-}
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr SendMessageTimeout(
+        IntPtr hWnd, uint Msg, IntPtr wParam, string lParam,
+        uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
 
-file static class GuidExtensions
-{
-    public static byte[] ToByteArrayLe(this Guid guid)
-    {
-        var bytes = guid.ToByteArray();
-        return bytes;
-    }
+    #endregion
 }

@@ -29,11 +29,17 @@
   <s:String x:Key="No">否</s:String>
   <s:String x:Key="Ok">确定</s:String>
   <s:String x:Key="Cancel">取消</s:String>
+  <s:String x:Key="Close">关闭</s:String>
+  <s:String x:Key="Back">返回</s:String>
   <s:String x:Key="LoadMirrorFailed">加载镜像列表失败</s:String>
   <s:String x:Key="SpeedTesting">正在测速...</s:String>
   <s:String x:Key="MirrorSpeedUnit">MB/s</s:String>
   <s:String x:Key="Unreachable">不可用</s:String>
   <s:String x:Key="Step_Download">下载安装包</s:String>
+  <s:String x:Key="StepConfig">配置</s:String>
+  <s:String x:Key="StepDownload">下载</s:String>
+  <s:String x:Key="StepInstall">安装</s:String>
+  <s:String x:Key="StepComplete">完成</s:String>
   <s:String x:Key="Step_Verify">校验文件完整性</s:String>
   <s:String x:Key="Step_Extract">安装应用</s:String>
   <s:String x:Key="Step_CreateShortcut">创建快捷方式</s:String>
@@ -77,4 +83,11 @@
   <s:String x:Key="Channel_Beta_Desc">测试版本，可能存在不稳定因素</s:String>
   <s:String x:Key="Channel_Nightly_Desc">每日构建版本，包含最新的开发代码</s:String>
   <s:String x:Key="Channel_Warning">此渠道版本可能不稳定，仅建议测试用途。生产环境请使用正式版。</s:String>
+  <s:String x:Key="ComponentSelection">组件选择</s:String>
+  <s:String x:Key="Rollback">回滚到上一版本</s:String>
+  <s:String x:Key="NoRollbackAvailable">无可用历史版本</s:String>
+  <s:String x:Key="RollbackConfirm">确定要回滚到版本 {0} 吗？</s:String>
+  <s:String x:Key="DeltaUpdate">增量更新</s:String>
+  <s:String x:Key="DeltaUpdateDesc">仅下载变更的文件以减少更新包大小</s:String>
+  <s:String x:Key="DeltaUpdateNotAvailable">无可用增量更新，将使用全量更新</s:String>
 </ResourceDictionary>

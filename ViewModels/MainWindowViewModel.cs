@@ -22,8 +22,15 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IPlatformAdapter? _platformAdapter;
     private readonly IPlatformDetector? _platformDetector;
     private readonly IChannelService? _channelService;
+    private readonly IComponentManager? _componentManager;
 
     private CancellationTokenSource? _installCts;
+
+    /// <summary>
+    /// <para>请求关闭窗口的事件。</para>
+    /// Event that requests the window to close.
+    /// </summary>
+    public event Action? RequestClose;
 
     /// <summary>
     /// <para>初始化 MainWindowViewModel 的新实例（设计时使用）。</para>
@@ -67,6 +74,10 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <para>发布渠道服务。</para>
     /// The channel service.
     /// </param>
+    /// <param name="componentManager">
+    /// <para>组件管理器。</para>
+    /// The component manager.
+    /// </param>
     public MainWindowViewModel(
         IInstallerService installerService,
         IReleaseApiService releaseApiService,
@@ -75,7 +86,8 @@ public partial class MainWindowViewModel : ViewModelBase
         ILocalizationService localizationService,
         IPlatformAdapter platformAdapter,
         IPlatformDetector platformDetector,
-        IChannelService channelService)
+        IChannelService channelService,
+        IComponentManager componentManager)
     {
         _installerService = installerService;
         _releaseApiService = releaseApiService;
@@ -85,6 +97,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _platformAdapter = platformAdapter;
         _platformDetector = platformDetector;
         _channelService = channelService;
+        _componentManager = componentManager;
 
         if (_localizationService is not null)
         {
@@ -119,6 +132,18 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(InstallButtonText));
         OnPropertyChanged(nameof(ChannelLabelText));
         OnPropertyChanged(nameof(ChannelWarningText));
+        OnPropertyChanged(nameof(ComponentSelectionText));
+        OnPropertyChanged(nameof(TotalInstallSizeText));
+        OnPropertyChanged(nameof(RollbackText));
+        OnPropertyChanged(nameof(DeltaUpdateText));
+        OnPropertyChanged(nameof(DeltaUpdateDescText));
+        OnPropertyChanged(nameof(CloseText));
+        OnPropertyChanged(nameof(CancelText));
+        OnPropertyChanged(nameof(BackText));
+        OnPropertyChanged(nameof(StepConfigText));
+        OnPropertyChanged(nameof(StepDownloadText));
+        OnPropertyChanged(nameof(StepInstallText));
+        OnPropertyChanged(nameof(StepCompleteText));
         UpdateChannelDisplayNames();
     }
 
@@ -145,10 +170,6 @@ public partial class MainWindowViewModel : ViewModelBase
     public string AlreadyInstalledDescText => L("AlreadyInstalledDesc", "UotanToolbox 已安装在您的设备上。");
     public string ReinstallText => L("Reinstall", "重新安装");
 
-    /// <summary>
-    /// <para>获取渠道标签的本地化文本。</para>
-    /// Gets the localized text for the channel label.
-    /// </summary>
     public string ChannelLabelText => L("ChannelLabel", "发布渠道");
 
     /// <summary>
@@ -164,6 +185,92 @@ public partial class MainWindowViewModel : ViewModelBase
     /// Gets whether the channel warning is visible.
     /// </summary>
     public bool IsChannelWarningVisible => SelectedChannel is not null && SelectedChannel.Channel != ReleaseChannel.Release;
+
+    /// <summary>
+    /// <para>获取组件选择的本地化文本。</para>
+    /// Gets the localized text for component selection.
+    /// </summary>
+    public string ComponentSelectionText => L("ComponentSelection", "组件选择");
+
+    /// <summary>
+    /// <para>获取格式化的总安装大小文本。</para>
+    /// Gets the formatted total install size text.
+    /// </summary>
+    public string TotalInstallSizeText
+    {
+        get
+        {
+            var totalBytes = AvailableComponents.Where(c => c.IsSelected).Sum(c => c.Size);
+            var sizeMB = totalBytes / 1024.0 / 1024.0;
+            return sizeMB >= 1024 ? $"{sizeMB / 1024.0:F1} GB" : $"{sizeMB:F1} MB";
+        }
+    }
+
+    /// <summary>
+    /// <para>获取是否显示组件选择区域。</para>
+    /// Gets whether the component selection area is visible.
+    /// </summary>
+    public bool HasComponents => AvailableComponents.Count > 0;
+
+    /// <summary>
+    /// <para>获取回滚按钮的本地化文本。</para>
+    /// Gets the localized text for the rollback button.
+    /// </summary>
+    public string RollbackText => L("Rollback", "回滚到上一版本");
+
+    /// <summary>
+    /// <para>获取增量更新的本地化文本。</para>
+    /// Gets the localized text for delta update.
+    /// </summary>
+    public string DeltaUpdateText => L("DeltaUpdate", "增量更新");
+
+    /// <summary>
+    /// <para>获取增量更新描述的本地化文本。</para>
+    /// Gets the localized description text for delta update.
+    /// </summary>
+    public string DeltaUpdateDescText => L("DeltaUpdateDesc", "仅下载变更的文件以减少更新包大小");
+
+    /// <summary>
+    /// <para>获取关闭按钮的本地化文本。</para>
+    /// Gets the localized text for the close button.
+    /// </summary>
+    public string CloseText => L("Close", "关闭");
+
+    /// <summary>
+    /// <para>获取取消按钮的本地化文本。</para>
+    /// Gets the localized text for the cancel button.
+    /// </summary>
+    public string CancelText => L("Cancel", "取消");
+
+    /// <summary>
+    /// <para>获取返回按钮的本地化文本。</para>
+    /// Gets the localized text for the back button.
+    /// </summary>
+    public string BackText => L("Back", "返回");
+
+    /// <summary>
+    /// <para>获取步骤指示器"配置"的本地化文本。</para>
+    /// Gets the localized text for the "Config" step indicator.
+    /// </summary>
+    public string StepConfigText => L("StepConfig", "配置");
+
+    /// <summary>
+    /// <para>获取步骤指示器"下载"的本地化文本。</para>
+    /// Gets the localized text for the "Download" step indicator.
+    /// </summary>
+    public string StepDownloadText => L("StepDownload", "下载");
+
+    /// <summary>
+    /// <para>获取步骤指示器"安装"的本地化文本。</para>
+    /// Gets the localized text for the "Install" step indicator.
+    /// </summary>
+    public string StepInstallText => L("StepInstall", "安装");
+
+    /// <summary>
+    /// <para>获取步骤指示器"完成"的本地化文本。</para>
+    /// Gets the localized text for the "Complete" step indicator.
+    /// </summary>
+    public string StepCompleteText => L("StepComplete", "完成");
 
     #endregion
 
@@ -199,6 +306,12 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     public bool IsAlreadyInstalledStep => CurrentStep == InstallStep.AlreadyInstalled;
 
+    public bool IsStep2NotReached => !IsChooseMirrorStep && !IsStep2Completed;
+    public bool IsStep3NotReached => !IsInstallingStep && !IsStep3Completed;
+    public bool IsStep4NotReached => !IsFinishStep;
+
+    public bool IsStepProgressVisible => CurrentStep is InstallStep.Eula or InstallStep.ChooseMirror or InstallStep.Installing or InstallStep.Finish;
+
     #endregion
 
     #region Current Step
@@ -206,14 +319,56 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private InstallStep _currentStep = InstallStep.Eula;
 
+    /// <summary>
+    /// <para>获取或设置步骤进度索引，用于步骤指示器显示。</para>
+    /// Gets or sets the step progress index for the step indicator display.
+    /// </summary>
+    [ObservableProperty]
+    private int _stepProgressIndex;
+
     partial void OnCurrentStepChanged(InstallStep value)
     {
+        StepProgressIndex = value switch
+        {
+            InstallStep.Eula => 0,
+            InstallStep.ChooseMirror => 1,
+            InstallStep.Installing => 2,
+            InstallStep.Finish => 3,
+            InstallStep.AlreadyInstalled => 3,
+            _ => -1,
+        };
+
         OnPropertyChanged(nameof(IsEulaStep));
         OnPropertyChanged(nameof(IsChooseMirrorStep));
         OnPropertyChanged(nameof(IsInstallingStep));
         OnPropertyChanged(nameof(IsFinishStep));
         OnPropertyChanged(nameof(IsAlreadyInstalledStep));
+        OnPropertyChanged(nameof(IsStep1Completed));
+        OnPropertyChanged(nameof(IsStep2Completed));
+        OnPropertyChanged(nameof(IsStep3Completed));
+        OnPropertyChanged(nameof(IsStep2NotReached));
+        OnPropertyChanged(nameof(IsStep3NotReached));
+        OnPropertyChanged(nameof(IsStep4NotReached));
+        OnPropertyChanged(nameof(IsStepProgressVisible));
     }
+
+    /// <summary>
+    /// <para>获取步骤1（配置）是否已完成。</para>
+    /// Gets whether step 1 (Configure) is completed.
+    /// </summary>
+    public bool IsStep1Completed => StepProgressIndex > 0;
+
+    /// <summary>
+    /// <para>获取步骤2（下载）是否已完成。</para>
+    /// Gets whether step 2 (Download) is completed.
+    /// </summary>
+    public bool IsStep2Completed => StepProgressIndex > 1;
+
+    /// <summary>
+    /// <para>获取步骤3（安装）是否已完成。</para>
+    /// Gets whether step 3 (Install) is completed.
+    /// </summary>
+    public bool IsStep3Completed => StepProgressIndex > 2;
 
     #endregion
 
@@ -224,6 +379,48 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isCreateShortcut = true;
+
+    #endregion
+
+    #region Component Selection
+
+    /// <summary>
+    /// <para>获取或设置可用组件列表。</para>
+    /// Gets or sets the list of available components.
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<ComponentDefinition> _availableComponents = [];
+
+    /// <summary>
+    /// <para>获取或设置总安装大小估算（字节）。</para>
+    /// Gets or sets the estimated total install size in bytes.
+    /// </summary>
+    [ObservableProperty]
+    private long _totalInstallSize;
+
+    partial void OnAvailableComponentsChanged(ObservableCollection<ComponentDefinition> value)
+    {
+        OnPropertyChanged(nameof(HasComponents));
+        SubscribeToComponentChanges();
+        UpdateTotalInstallSize();
+    }
+
+    private void SubscribeToComponentChanges()
+    {
+        foreach (var component in AvailableComponents)
+        {
+            component.PropertyChanged -= OnComponentPropertyChanged;
+            component.PropertyChanged += OnComponentPropertyChanged;
+        }
+    }
+
+    private void OnComponentPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ComponentDefinition.IsSelected))
+        {
+            UpdateTotalInstallSize();
+        }
+    }
 
     #endregion
 
@@ -307,6 +504,111 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private string _installedVersion = string.Empty;
 
+    /// <summary>
+    /// <para>获取或设置是否可以回滚到上一版本。</para>
+    /// Gets or sets whether rollback to a previous version is available.
+    /// </summary>
+    [ObservableProperty]
+    private bool _canRollback;
+
+    /// <summary>
+    /// <para>获取或设置上一版本号文本。</para>
+    /// Gets or sets the previous version text.
+    /// </summary>
+    [ObservableProperty]
+    private string _previousVersionText = string.Empty;
+
+    /// <summary>
+    /// <para>回滚到上一版本命令。</para>
+    /// Rollback to the previous version command.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanRollback))]
+    private async Task RollbackAsync()
+    {
+        if (_installerService is null || _dialogService is null || string.IsNullOrEmpty(InstallPath)) return;
+
+        var confirmMessage = string.Format(L("RollbackConfirm", "确定要回滚到版本 {0} 吗？"), PreviousVersionText);
+        var confirmed = await _dialogService.ShowConfirmAsync(L("Rollback", "回滚到上一版本"), confirmMessage).ConfigureAwait(true);
+        if (!confirmed) return;
+
+        try
+        {
+            var progress = new Progress<DeploymentProgress>(p =>
+            {
+                InstallStatusText = p.Message;
+            });
+
+            var result = await _installerService.RollbackAsync(InstallPath, PreviousVersionText, progress).ConfigureAwait(true);
+            if (result.IsSuccess)
+            {
+                CurrentStep = InstallStep.AlreadyInstalled;
+                InstalledVersion = PreviousVersionText;
+                CanRollback = false;
+                PreviousVersionText = string.Empty;
+                try
+                {
+                    var versions = await _installerService.GetInstalledVersionsAsync(InstallPath).ConfigureAwait(true);
+                    if (versions.Count > 1)
+                    {
+                        CanRollback = true;
+                        PreviousVersionText = versions[^2].Version;
+                    }
+                }
+                catch
+                {
+                }
+            }
+            else
+            {
+                await _dialogService.ShowErrorAsync(L("InstallFailed", "安装失败"), result.ErrorMessage ?? string.Empty);
+            }
+        }
+        catch (Exception ex)
+        {
+            await _dialogService.ShowErrorAsync(L("InstallFailed", "安装失败"), ex.Message);
+        }
+    }
+
+    #endregion
+
+    #region Window Commands
+
+    /// <summary>
+    /// <para>关闭窗口命令。</para>
+    /// Close window command.
+    /// </summary>
+    [RelayCommand]
+    private void CloseWindow()
+    {
+        RequestClose?.Invoke();
+    }
+
+    /// <summary>
+    /// <para>取消安装命令。</para>
+    /// Cancel install command.
+    /// </summary>
+    [RelayCommand]
+    private void CancelInstall()
+    {
+        _installCts?.Cancel();
+    }
+
+    /// <summary>
+    /// <para>返回镜像选择步骤命令。</para>
+    /// Navigate back to mirror selection step command.
+    /// </summary>
+    [RelayCommand]
+    private void BackToMirrorStep()
+    {
+        CurrentStep = InstallStep.ChooseMirror;
+    }
+
+    [RelayCommand]
+    private void BackToEulaStep()
+    {
+        CurrentStep = InstallStep.Eula;
+    }
+
     #endregion
 
     #region Config
@@ -322,6 +624,13 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     private string? _installPath;
+
+    /// <summary>
+    /// <para>获取或设置是否使用增量更新。</para>
+    /// Gets or sets whether to use delta updates.
+    /// </summary>
+    [ObservableProperty]
+    private bool _useDeltaUpdate = true;
 
     /// <summary>
     /// <para>获取安装按钮的显示文本。</para>
@@ -343,6 +652,12 @@ public partial class MainWindowViewModel : ViewModelBase
         var selectedPath = await _dialogService.BrowseFolderAsync(L("SelectInstallPath", "选择安装路径"), InstallPath);
         if (selectedPath is not null)
         {
+            var dirName = Path.GetFileName(selectedPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            if (!string.Equals(dirName, "UotanToolbox", StringComparison.OrdinalIgnoreCase))
+            {
+                selectedPath = Path.Combine(selectedPath, "UotanToolbox");
+            }
+
             InstallPath = selectedPath;
         }
     }
@@ -486,6 +801,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 CreateDesktopShortcut = IsCreateShortcut,
                 LaunchAfterInstall = false,
                 Channel = SelectedChannel?.Channel ?? ReleaseChannel.Release,
+                SelectedComponents = AvailableComponents.Where(c => c.IsSelected).ToList(),
+                UseDeltaUpdate = UseDeltaUpdate && IsUpdate,
+                CurrentVersion = IsUpdate ? InstalledVersion : null,
             };
 
             var progress = new Progress<DeploymentProgress>(OnDeploymentProgress);
@@ -583,6 +901,10 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void Reinstall()
     {
+        RetryCount = 0;
+        IsInstallFailed = false;
+        InstallProgressValue = 0;
+        IsInstallSuccess = true;
         CurrentStep = InstallStep.ChooseMirror;
         _ = LoadMirrorsAsync();
     }
@@ -607,6 +929,23 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 InstalledVersion = config.CurrVersion;
                 CurrentStep = InstallStep.AlreadyInstalled;
+
+                if (_installerService is not null && !string.IsNullOrEmpty(config.InstallPath))
+                {
+                    try
+                    {
+                        var versions = await _installerService.GetInstalledVersionsAsync(config.InstallPath).ConfigureAwait(false);
+                        if (versions.Count > 1)
+                        {
+                            CanRollback = true;
+                            var previousRecord = versions[^2];
+                            PreviousVersionText = previousRecord.Version;
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
             }
         }
         catch
@@ -661,6 +1000,12 @@ public partial class MainWindowViewModel : ViewModelBase
     #endregion
 
     #region Private Methods
+
+    private void UpdateTotalInstallSize()
+    {
+        TotalInstallSize = AvailableComponents.Where(c => c.IsSelected).Sum(c => c.Size);
+        OnPropertyChanged(nameof(TotalInstallSizeText));
+    }
 
     private void UpdateChannelDisplayNames()
     {
@@ -718,6 +1063,24 @@ public partial class MainWindowViewModel : ViewModelBase
             if (Mirrors.Count > 0)
             {
                 SelectedMirror = Mirrors[0];
+            }
+
+            if (_componentManager is not null)
+            {
+                try
+                {
+                    var channel = SelectedChannel?.Channel ?? ReleaseChannel.Release;
+                    var releases = await _releaseApiService.GetReleasesByChannelAsync(channel);
+                    var latestRelease = releases.FirstOrDefault();
+                    if (latestRelease?.Body is not null)
+                    {
+                        var components = await _componentManager.ParseComponentsAsync(latestRelease.Body);
+                        AvailableComponents = new ObservableCollection<ComponentDefinition>(components);
+                    }
+                }
+                catch
+                {
+                }
             }
 
             await SpeedTestAsync();
@@ -803,6 +1166,12 @@ public partial class MainWindowViewModel : ViewModelBase
         if (CurrentStep == InstallStep.Installing)
         {
             return await _dialogService.ShowConfirmAsync(L("Notice", "提示"), L("ConfirmExitInstalling", "安装尚未完成，确定要退出安装吗？"));
+        }
+
+        if (CurrentStep == InstallStep.Finish ||
+            CurrentStep == InstallStep.AlreadyInstalled)
+        {
+            return true;
         }
 
         return await _dialogService.ShowConfirmAsync(L("Notice", "提示"), L("ConfirmExit", "确定要退出安装吗？"));

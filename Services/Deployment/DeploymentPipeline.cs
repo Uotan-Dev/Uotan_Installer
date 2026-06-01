@@ -9,19 +9,31 @@ namespace UotanInstaller.App.Services.Deployment;
 public sealed class DeploymentPipeline : IDeploymentPipeline
 {
     private readonly ILocalizationService _localizationService;
+    private readonly IInstallLogger _logger;
+    private readonly string _logDirectory;
     private readonly List<IDeploymentStep> _steps = [];
 
     /// <summary>
-    /// <para>使用本地化服务初始化 DeploymentPipeline 的新实例。</para>
-    /// Initializes a new instance of DeploymentPipeline with the localization service.
+    /// <para>使用本地化服务和安装日志服务初始化 DeploymentPipeline 的新实例。</para>
+    /// Initializes a new instance of DeploymentPipeline with the localization service and install logger.
     /// </summary>
     /// <param name="localizationService">
     /// <para>本地化服务实例。</para>
     /// The localization service instance.
     /// </param>
-    public DeploymentPipeline(ILocalizationService localizationService)
+    /// <param name="logger">
+    /// <para>安装日志服务实例。</para>
+    /// The install logger instance.
+    /// </param>
+    /// <param name="logDirectory">
+    /// <para>日志文件目录。</para>
+    /// The log file directory.
+    /// </param>
+    public DeploymentPipeline(ILocalizationService localizationService, IInstallLogger logger, string logDirectory)
     {
         _localizationService = localizationService;
+        _logger = logger;
+        _logDirectory = logDirectory;
     }
 
     /// <summary>
@@ -63,9 +75,138 @@ public sealed class DeploymentPipeline : IDeploymentPipeline
         var stopwatch = Stopwatch.StartNew();
         var completedSteps = new List<DeploymentStepResult>();
 
-        if (_steps.Count == 0)
+        _logger.Initialize(_logDirectory);
+
+        try
         {
+            if (_steps.Count == 0)
+            {
+                stopwatch.Stop();
+                return new DeploymentResult
+                {
+                    IsSuccess = true,
+                    CompletedSteps = completedSteps,
+                    Elapsed = stopwatch.Elapsed,
+                };
+            }
+
+            for (var i = 0; i < _steps.Count; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var step = _steps[i];
+                var overallProgress = (double)i / _steps.Count;
+
+                if (step.Skip)
+                {
+                    var skippedResult = new DeploymentStepResult
+                    {
+                        StepName = step.Name,
+                        Kind = step.Kind,
+                        IsSuccess = true,
+                    };
+                    completedSteps.Add(skippedResult);
+
+                    progress?.Report(new DeploymentProgress
+                    {
+                        StepName = step.Name,
+                        Kind = step.Kind,
+                        ProgressValue = overallProgress,
+                        Message = _localizationService["Step_Skipped"],
+                        IsStepCompleted = true,
+                    });
+
+                    continue;
+                }
+
+                var executingText = _localizationService["Step_Executing"];
+                progress?.Report(new DeploymentProgress
+                {
+                    StepName = step.Name,
+                    Kind = step.Kind,
+                    ProgressValue = overallProgress,
+                    Message = $"{executingText} {step.Name}",
+                });
+
+                _logger.LogInformation(step.Name, "Starting step");
+
+                DeploymentStepResult result;
+
+                try
+                {
+                    var stepProgress = new Progress<DeploymentProgress>(p =>
+                    {
+                        var stepContribution = 1.0 / _steps.Count;
+                        var combinedProgress = overallProgress + p.ProgressValue * stepContribution;
+                        progress?.Report(new DeploymentProgress
+                        {
+                            StepName = p.StepName,
+                            Kind = p.Kind,
+                            ProgressValue = combinedProgress,
+                            Message = p.Message,
+                        });
+                    });
+
+                    result = await step.ExecuteAsync(stepProgress, ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException ex)
+                {
+                    _logger.LogError(step.Name, "Step failed", ex);
+                    stopwatch.Stop();
+                    var cancelledText = _localizationService["InstallCancelled"];
+                    return new DeploymentResult
+                    {
+                        IsSuccess = false,
+                        CompletedSteps = completedSteps,
+                        FailedStep = new DeploymentStepResult
+                        {
+                            StepName = step.Name,
+                            Kind = step.Kind,
+                            IsSuccess = false,
+                            ErrorMessage = cancelledText,
+                        },
+                        ErrorMessage = cancelledText,
+                        Elapsed = stopwatch.Elapsed,
+                    };
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(step.Name, "Step failed", ex);
+                    stopwatch.Stop();
+                    var errorMessage = ex is DeploymentException dex ? dex.Message : ex.Message;
+                    return new DeploymentResult
+                    {
+                        IsSuccess = false,
+                        CompletedSteps = completedSteps,
+                        FailedStep = new DeploymentStepResult
+                        {
+                            StepName = step.Name,
+                            Kind = step.Kind,
+                            IsSuccess = false,
+                            ErrorMessage = errorMessage,
+                            Error = ex,
+                        },
+                        ErrorMessage = errorMessage,
+                        Elapsed = stopwatch.Elapsed,
+                    };
+                }
+
+                completedSteps.Add(result);
+                _logger.LogInformation(step.Name, "Step completed");
+
+                var completedText = _localizationService["Step_Completed"];
+                progress?.Report(new DeploymentProgress
+                {
+                    StepName = step.Name,
+                    Kind = step.Kind,
+                    ProgressValue = (double)(i + 1) / _steps.Count,
+                    Message = $"{step.Name} {completedText}",
+                    IsStepCompleted = true,
+                });
+            }
+
             stopwatch.Stop();
+
             return new DeploymentResult
             {
                 IsSuccess = true,
@@ -73,124 +214,9 @@ public sealed class DeploymentPipeline : IDeploymentPipeline
                 Elapsed = stopwatch.Elapsed,
             };
         }
-
-        for (var i = 0; i < _steps.Count; i++)
+        finally
         {
-            ct.ThrowIfCancellationRequested();
-
-            var step = _steps[i];
-            var overallProgress = (double)i / _steps.Count;
-
-            if (step.Skip)
-            {
-                var skippedResult = new DeploymentStepResult
-                {
-                    StepName = step.Name,
-                    Kind = step.Kind,
-                    IsSuccess = true,
-                };
-                completedSteps.Add(skippedResult);
-
-                progress?.Report(new DeploymentProgress
-                {
-                    StepName = step.Name,
-                    Kind = step.Kind,
-                    ProgressValue = overallProgress,
-                    Message = _localizationService["Step_Skipped"],
-                    IsStepCompleted = true,
-                });
-
-                continue;
-            }
-
-            var executingText = _localizationService["Step_Executing"];
-            progress?.Report(new DeploymentProgress
-            {
-                StepName = step.Name,
-                Kind = step.Kind,
-                ProgressValue = overallProgress,
-                Message = $"{executingText} {step.Name}",
-            });
-
-            DeploymentStepResult result;
-
-            try
-            {
-                var stepProgress = new Progress<DeploymentProgress>(p =>
-                {
-                    var stepContribution = 1.0 / _steps.Count;
-                    var combinedProgress = overallProgress + p.ProgressValue * stepContribution;
-                    progress?.Report(new DeploymentProgress
-                    {
-                        StepName = p.StepName,
-                        Kind = p.Kind,
-                        ProgressValue = combinedProgress,
-                        Message = p.Message,
-                    });
-                });
-
-                result = await step.ExecuteAsync(stepProgress, ct).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                stopwatch.Stop();
-                var cancelledText = _localizationService["InstallCancelled"];
-                return new DeploymentResult
-                {
-                    IsSuccess = false,
-                    CompletedSteps = completedSteps,
-                    FailedStep = new DeploymentStepResult
-                    {
-                        StepName = step.Name,
-                        Kind = step.Kind,
-                        IsSuccess = false,
-                        ErrorMessage = cancelledText,
-                    },
-                    ErrorMessage = cancelledText,
-                    Elapsed = stopwatch.Elapsed,
-                };
-            }
-            catch (Exception ex)
-            {
-                stopwatch.Stop();
-                var errorMessage = ex is DeploymentException dex ? dex.Message : ex.Message;
-                return new DeploymentResult
-                {
-                    IsSuccess = false,
-                    CompletedSteps = completedSteps,
-                    FailedStep = new DeploymentStepResult
-                    {
-                        StepName = step.Name,
-                        Kind = step.Kind,
-                        IsSuccess = false,
-                        ErrorMessage = errorMessage,
-                        Error = ex,
-                    },
-                    ErrorMessage = errorMessage,
-                    Elapsed = stopwatch.Elapsed,
-                };
-            }
-
-            completedSteps.Add(result);
-
-            var completedText = _localizationService["Step_Completed"];
-            progress?.Report(new DeploymentProgress
-            {
-                StepName = step.Name,
-                Kind = step.Kind,
-                ProgressValue = (double)(i + 1) / _steps.Count,
-                Message = $"{step.Name} {completedText}",
-                IsStepCompleted = true,
-            });
+            await _logger.FlushAsync().ConfigureAwait(false);
         }
-
-        stopwatch.Stop();
-
-        return new DeploymentResult
-        {
-            IsSuccess = true,
-            CompletedSteps = completedSteps,
-            Elapsed = stopwatch.Elapsed,
-        };
     }
 }

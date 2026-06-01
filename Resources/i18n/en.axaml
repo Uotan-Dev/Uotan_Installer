@@ -29,11 +29,17 @@
   <s:String x:Key="No">No</s:String>
   <s:String x:Key="Ok">OK</s:String>
   <s:String x:Key="Cancel">Cancel</s:String>
+  <s:String x:Key="Close">Close</s:String>
+  <s:String x:Key="Back">Back</s:String>
   <s:String x:Key="LoadMirrorFailed">Failed to load mirror list</s:String>
   <s:String x:Key="SpeedTesting">Testing speed...</s:String>
   <s:String x:Key="MirrorSpeedUnit">MB/s</s:String>
   <s:String x:Key="Unreachable">Unreachable</s:String>
   <s:String x:Key="Step_Download">Download Package</s:String>
+  <s:String x:Key="StepConfig">Configure</s:String>
+  <s:String x:Key="StepDownload">Download</s:String>
+  <s:String x:Key="StepInstall">Install</s:String>
+  <s:String x:Key="StepComplete">Complete</s:String>
   <s:String x:Key="Step_Verify">Verify Integrity</s:String>
   <s:String x:Key="Step_Extract">Install Application</s:String>
   <s:String x:Key="Step_CreateShortcut">Create Shortcut</s:String>
@@ -77,4 +83,11 @@
   <s:String x:Key="Channel_Beta_Desc">Beta version, may be unstable</s:String>
   <s:String x:Key="Channel_Nightly_Desc">Nightly build with the latest development code</s:String>
   <s:String x:Key="Channel_Warning">This channel may be unstable and is intended for testing only. Use Release for production.</s:String>
+  <s:String x:Key="ComponentSelection">Component Selection</s:String>
+  <s:String x:Key="Rollback">Rollback to Previous Version</s:String>
+  <s:String x:Key="NoRollbackAvailable">No previous version available</s:String>
+  <s:String x:Key="RollbackConfirm">Are you sure you want to rollback to version {0}?</s:String>
+  <s:String x:Key="DeltaUpdate">Delta Update</s:String>
+  <s:String x:Key="DeltaUpdateDesc">Download only changed files to reduce update size</s:String>
+  <s:String x:Key="DeltaUpdateNotAvailable">No delta update available, full update will be used</s:String>
 </ResourceDictionary>

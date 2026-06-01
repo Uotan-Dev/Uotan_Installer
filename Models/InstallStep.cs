@@ -16,23 +16,23 @@ public enum InstallStep
     /// <para>选择镜像源步骤。</para>
     /// Choose mirror step.
     /// </summary>
-    ChooseMirror = 3,
+    ChooseMirror = 2,
 
     /// <summary>
     /// <para>正在安装步骤。</para>
     /// Installing step.
     /// </summary>
-    Installing = 4,
+    Installing = 3,
 
     /// <summary>
     /// <para>安装完成步骤。</para>
     /// Finish step.
     /// </summary>
-    Finish = 5,
+    Finish = 4,
 
     /// <summary>
     /// <para>已安装步骤。</para>
     /// Already installed step.
     /// </summary>
-    AlreadyInstalled = 6,
+    AlreadyInstalled = 5,
 }

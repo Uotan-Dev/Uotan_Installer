@@ -29,11 +29,17 @@
   <s:String x:Key="No">いいえ</s:String>
   <s:String x:Key="Ok">OK</s:String>
   <s:String x:Key="Cancel">キャンセル</s:String>
+  <s:String x:Key="Close">閉じる</s:String>
+  <s:String x:Key="Back">戻る</s:String>
   <s:String x:Key="LoadMirrorFailed">ミラーリストの読み込みに失敗しました</s:String>
   <s:String x:Key="SpeedTesting">速度を測定中...</s:String>
   <s:String x:Key="MirrorSpeedUnit">MB/s</s:String>
   <s:String x:Key="Unreachable">到達不可</s:String>
   <s:String x:Key="Step_Download">パッケージをダウンロード</s:String>
+  <s:String x:Key="StepConfig">設定</s:String>
+  <s:String x:Key="StepDownload">ダウンロード</s:String>
+  <s:String x:Key="StepInstall">インストール</s:String>
+  <s:String x:Key="StepComplete">完了</s:String>
   <s:String x:Key="Step_Verify">整合性を確認</s:String>
   <s:String x:Key="Step_Extract">アプリケーションをインストール</s:String>
   <s:String x:Key="Step_CreateShortcut">ショートカットを作成</s:String>
@@ -77,4 +83,11 @@
   <s:String x:Key="Channel_Beta_Desc">ベータ版、不安定な場合があります</s:String>
   <s:String x:Key="Channel_Nightly_Desc">最新の開発コードを含むナイトリービルド</s:String>
   <s:String x:Key="Channel_Warning">このチャンネルは不安定な場合があり、テスト目的のみです。本番環境ではリリース版をご使用ください。</s:String>
+  <s:String x:Key="ComponentSelection">コンポーネント選択</s:String>
+  <s:String x:Key="Rollback">前のバージョンに戻す</s:String>
+  <s:String x:Key="NoRollbackAvailable">利用可能な履歴バージョンがありません</s:String>
+  <s:String x:Key="RollbackConfirm">バージョン {0} に戻しますか？</s:String>
+  <s:String x:Key="DeltaUpdate">差分アップデート</s:String>
+  <s:String x:Key="DeltaUpdateDesc">変更されたファイルのみダウンロードしてアップデートサイズを削減</s:String>
+  <s:String x:Key="DeltaUpdateNotAvailable">差分アップデートが利用できません。完全アップデートを使用します</s:String>
 </ResourceDictionary>

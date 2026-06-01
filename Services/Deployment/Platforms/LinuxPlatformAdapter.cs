@@ -343,6 +343,150 @@ public sealed class LinuxPlatformAdapter : IPlatformAdapter
     }
 
     /// <summary>
+    /// <para>异步注册 URL 协议处理器。</para>
+    /// Asynchronously registers a URL protocol handler.
+    /// </summary>
+    public Task RegisterProtocolHandlerAsync(string scheme, string exePath, CancellationToken ct)
+    {
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var applicationsDir = Path.Combine(homeDir, ".local", "share", "applications");
+            if (!Directory.Exists(applicationsDir))
+            {
+                Directory.CreateDirectory(applicationsDir);
+            }
+
+            var desktopContent = $@"[Desktop Entry]
+Type=Application
+Name={scheme} Handler
+Exec={exePath} %u
+MimeType=x-scheme-handler/{scheme};
+NoDisplay=true";
+
+            var desktopFilePath = Path.Combine(applicationsDir, $"{scheme}-handler.desktop");
+            File.WriteAllText(desktopFilePath, desktopContent, Encoding.UTF8);
+
+            try
+            {
+                var xdgMimePsi = new ProcessStartInfo
+                {
+                    FileName = "xdg-mime",
+                    Arguments = $"default {scheme}-handler.desktop x-scheme-handler/{scheme}",
+                    UseShellExecute = false,
+                };
+                using var xdgMimeProcess = Process.Start(xdgMimePsi);
+                xdgMimeProcess?.WaitForExit();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to set default protocol handler via xdg-mime: {ex.Message}");
+            }
+
+            try
+            {
+                var updateDbPsi = new ProcessStartInfo
+                {
+                    FileName = "update-desktop-database",
+                    Arguments = applicationsDir,
+                    UseShellExecute = false,
+                };
+                using var updateDbProcess = Process.Start(updateDbPsi);
+                updateDbProcess?.WaitForExit();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to update desktop database: {ex.Message}");
+            }
+        }, ct);
+    }
+
+    /// <summary>
+    /// <para>异步将指定目录添加到系统 PATH 环境变量。</para>
+    /// Asynchronously adds the specified directory to the system PATH environment variable.
+    /// </summary>
+    public Task AddToSystemPathAsync(string directory, CancellationToken ct)
+    {
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var profilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".profile");
+            var exportLine = $"export PATH=\"$PATH:{directory}\"";
+
+            if (!File.Exists(profilePath))
+            {
+                File.WriteAllText(profilePath, exportLine + "\n");
+                return;
+            }
+
+            var content = File.ReadAllText(profilePath);
+            if (content.Contains(directory)) return;
+
+            File.AppendAllText(profilePath, "\n" + exportLine + "\n");
+        }, ct);
+    }
+
+    /// <summary>
+    /// <para>异步从系统 PATH 环境变量中移除指定目录。</para>
+    /// Asynchronously removes the specified directory from the system PATH environment variable.
+    /// </summary>
+    public Task RemoveFromSystemPathAsync(string directory, CancellationToken ct)
+    {
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var profilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".profile");
+            if (!File.Exists(profilePath)) return;
+
+            var lines = File.ReadAllLines(profilePath)
+                .Where(l => !l.Contains(directory))
+                .ToArray();
+            File.WriteAllLines(profilePath, lines);
+        }, ct);
+    }
+
+    /// <summary>
+    /// <para>获取指定应用程序的数据目录路径。</para>
+    /// Gets the data directory path for the specified application.
+    /// </summary>
+    public string GetAppDataDirectory(string appName)
+    {
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), appName);
+    }
+
+    /// <summary>
+    /// <para>异步获取指定安装路径中应用程序的已安装版本号。</para>
+    /// Asynchronously gets the installed version number of the application at the specified installation path.
+    /// </summary>
+    public Task<string?> GetInstalledVersionAsync(string installPath)
+    {
+        return Task.Run(() =>
+        {
+            if (!Directory.Exists(installPath)) return null;
+
+            try
+            {
+                var versionFile = Path.Combine(installPath, "version.txt");
+                if (File.Exists(versionFile))
+                {
+                    var version = File.ReadAllText(versionFile).Trim();
+                    return string.IsNullOrWhiteSpace(version) ? null : version;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to read version.txt from '{installPath}': {ex.Message}");
+            }
+
+            return null;
+        });
+    }
+
+    /// <summary>
     /// <para>检查指定文件是否具有可执行权限，通过调用 Linux test -x 命令判断。</para>
     /// Checks whether the specified file has execute permission by invoking the Linux test -x command.
     /// </summary>

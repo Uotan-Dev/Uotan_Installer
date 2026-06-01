@@ -17,6 +17,19 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         Closing += OnWindowClosing;
+        DataContextChanged += OnDataContextChanged;
+    }
+
+    private void OnDataContextChanged(object? sender, EventArgs e)
+    {
+        if (DataContext is MainWindowViewModel vm)
+        {
+            vm.RequestClose += () =>
+            {
+                Closing -= OnWindowClosing;
+                Close();
+            };
+        }
     }
 
     private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)

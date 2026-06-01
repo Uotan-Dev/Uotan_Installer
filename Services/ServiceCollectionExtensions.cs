@@ -27,6 +27,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<IGitHubMirrorService, GitHubMirrorService>();
         services.AddSingleton<IHttpService, HttpService>();
+        services.AddSingleton<IInstallLogger, InstallLogger>();
         services.AddSingleton<IChannelService, ChannelService>();
         services.AddSingleton<IReleaseApiService, ReleaseApiService>();
         services.AddSingleton<IProcessService, ProcessService>();
@@ -38,6 +39,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPlatformAdapter>(sp =>
             PlatformAdapterFactory.Create(sp.GetRequiredService<IPlatformDetector>()));
         services.AddSingleton<IDeploymentRuleEngine, DeploymentRuleEngine>();
+        services.AddSingleton<IComponentManager, ComponentManager>();
+        services.AddSingleton<IVersionManager, VersionManager>();
+        services.AddSingleton<IDeltaUpdateService, DeltaUpdateService>();
         services.AddSingleton<IInstallerService, InstallerService>();
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddSingleton<MainWindowViewModel>();

@@ -7,6 +7,11 @@ namespace UotanInstaller.App.Services;
 [JsonSerializable(typeof(GitHubReleaseAsset))]
 [JsonSerializable(typeof(GitHubRelease[]))]
 [JsonSerializable(typeof(ReleaseChannelInfo))]
+[JsonSerializable(typeof(ComponentDefinition))]
+[JsonSerializable(typeof(ComponentDefinition[]))]
+[JsonSerializable(typeof(VersionRecord))]
+[JsonSerializable(typeof(VersionRecord[]))]
+[JsonSerializable(typeof(DeltaUpdateInfo))]
 internal sealed partial class AppJsonContext : JsonSerializerContext
 {
 }

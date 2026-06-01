@@ -24,6 +24,10 @@ public sealed class InstallerService : IInstallerService
     private readonly ILocalizationService _localizationService;
     private readonly IGitHubMirrorService _gitHubMirrorService;
     private readonly IChannelService _channelService;
+    private readonly IInstallLogger _installLogger;
+    private readonly IComponentManager _componentManager;
+    private readonly IVersionManager _versionManager;
+    private readonly IDeltaUpdateService _deltaUpdateService;
 
     /// <summary>
     /// <para>初始化 InstallerService 实例</para>
@@ -73,6 +77,22 @@ public sealed class InstallerService : IInstallerService
     /// <para>发布渠道服务</para>
     /// The channel service
     /// </param>
+    /// <param name="installLogger">
+    /// <para>安装日志服务</para>
+    /// The install logger
+    /// </param>
+    /// <param name="componentManager">
+    /// <para>组件管理器。</para>
+    /// The component manager.
+    /// </param>
+    /// <param name="versionManager">
+    /// <para>版本管理器。</para>
+    /// The version manager.
+    /// </param>
+    /// <param name="deltaUpdateService">
+    /// <para>增量更新服务。</para>
+    /// The delta update service.
+    /// </param>
     public InstallerService(
         IReleaseApiService releaseApiService,
         IFileService fileService,
@@ -84,7 +104,11 @@ public sealed class InstallerService : IInstallerService
         IPlatformAdapter platformAdapter,
         ILocalizationService localizationService,
         IGitHubMirrorService gitHubMirrorService,
-        IChannelService channelService)
+        IChannelService channelService,
+        IInstallLogger installLogger,
+        IComponentManager componentManager,
+        IVersionManager versionManager,
+        IDeltaUpdateService deltaUpdateService)
     {
         _releaseApiService = releaseApiService;
         _fileService = fileService;
@@ -97,6 +121,10 @@ public sealed class InstallerService : IInstallerService
         _localizationService = localizationService;
         _gitHubMirrorService = gitHubMirrorService;
         _channelService = channelService;
+        _installLogger = installLogger;
+        _componentManager = componentManager;
+        _versionManager = versionManager;
+        _deltaUpdateService = deltaUpdateService;
     }
 
     /// <inheritdoc/>
@@ -130,7 +158,35 @@ public sealed class InstallerService : IInstallerService
         var packageFileName = configuration.PackageFileName ?? "UotanToolbox.zip";
         var packagePath = Path.Combine(tempDir, packageFileName);
 
-        var pipeline = new DeploymentPipeline(_localizationService);
+        if (configuration.UseDeltaUpdate && !string.IsNullOrEmpty(configuration.CurrentVersion))
+        {
+            var targetVersion = configuration.PackageSources.FirstOrDefault()?.Url ?? string.Empty;
+            var deltaInfo = await _deltaUpdateService.CheckDeltaUpdateAvailableAsync(
+                configuration.CurrentVersion, targetVersion, cancellationToken).ConfigureAwait(false);
+
+            if (deltaInfo is not null)
+            {
+                try
+                {
+                    await _deltaUpdateService.ApplyDeltaUpdateAsync(deltaInfo, installDir, progress, cancellationToken).ConfigureAwait(false);
+
+                    await _versionManager.SaveVersionRecordAsync(installDir, new VersionRecord
+                    {
+                        Version = deltaInfo.ToVersion,
+                        InstallTime = DateTimeOffset.UtcNow.ToString("O"),
+                        Channel = configuration.Channel,
+                        InstallPath = installDir,
+                    }, cancellationToken).ConfigureAwait(false);
+
+                    return new DeploymentResult { IsSuccess = true };
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        var pipeline = new DeploymentPipeline(_localizationService, _installLogger, Path.Combine(installDir, "logs"));
 
         if (!configuration.OfflineMode)
         {
@@ -143,7 +199,13 @@ public sealed class InstallerService : IInstallerService
             }
         }
 
-        pipeline.AddStep(new ExtractStep(packagePath, installDir, _localizationService, configuration.FileRules));
+        IReadOnlyList<string>? includePatterns = null;
+        if (configuration.SelectedComponents.Count > 0)
+        {
+            includePatterns = _componentManager.ResolveFilePatterns(configuration.SelectedComponents);
+        }
+
+        pipeline.AddStep(new ExtractStep(packagePath, installDir, _localizationService, configuration.FileRules, includePatterns));
 
         if (configuration.CreateDesktopShortcut)
         {
@@ -168,6 +230,21 @@ public sealed class InstallerService : IInstallerService
         if (result.IsSuccess)
         {
             try { File.Delete(packagePath); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Warning: Failed to delete package file: {ex.Message}"); }
+
+            try
+            {
+                await _versionManager.SaveVersionRecordAsync(installDir, new VersionRecord
+                {
+                    Version = configuration.CurrentVersion ?? GetCurrentVersion(),
+                    InstallTime = DateTimeOffset.UtcNow.ToString("O"),
+                    Channel = configuration.Channel,
+                    InstallPath = installDir,
+                }, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Warning: Failed to save version record: {ex.Message}");
+            }
         }
 
         return result;
@@ -349,6 +426,26 @@ public sealed class InstallerService : IInstallerService
     {
         var tempDir = _platformAdapter.GetTempDirectory();
         await _fileService.CleanupTempFilesAsync(tempDir, "UotanToolbox.zip", cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<VersionRecord>> GetInstalledVersionsAsync(string installPath)
+    {
+        return await _versionManager.GetVersionHistoryAsync(installPath).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc/>
+    public async Task<DeploymentResult> RollbackAsync(string installPath, string targetVersion, IProgress<DeploymentProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _versionManager.RollbackAsync(installPath, targetVersion, progress, cancellationToken).ConfigureAwait(false);
+            return new DeploymentResult { IsSuccess = true };
+        }
+        catch (Exception ex)
+        {
+            return new DeploymentResult { IsSuccess = false, ErrorMessage = ex.Message };
+        }
     }
 
     private async Task<string?> TryGetInstalledVersionAsync(string installDir)

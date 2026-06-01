@@ -104,4 +104,44 @@ public interface IInstallerService
     /// An asynchronous task
     /// </returns>
     Task CleanupTempFilesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// <para>异步获取指定安装路径的版本安装历史记录。</para>
+    /// Asynchronously gets the version installation history for the specified installation path.
+    /// </summary>
+    /// <param name="installPath">
+    /// <para>安装目录路径。</para>
+    /// The installation directory path.
+    /// </param>
+    /// <returns>
+    /// <para>版本安装记录列表。</para>
+    /// The list of version installation records.
+    /// </returns>
+    Task<IReadOnlyList<VersionRecord>> GetInstalledVersionsAsync(string installPath);
+
+    /// <summary>
+    /// <para>异步回滚到指定版本。</para>
+    /// Asynchronously rolls back to the specified version.
+    /// </summary>
+    /// <param name="installPath">
+    /// <para>安装目录路径。</para>
+    /// The installation directory path.
+    /// </param>
+    /// <param name="targetVersion">
+    /// <para>目标版本号。</para>
+    /// The target version string.
+    /// </param>
+    /// <param name="progress">
+    /// <para>部署进度回调，可为 null。</para>
+    /// The deployment progress callback, or null.
+    /// </param>
+    /// <param name="cancellationToken">
+    /// <para>取消令牌。</para>
+    /// Cancellation token.
+    /// </param>
+    /// <returns>
+    /// <para>部署管线的执行结果。</para>
+    /// The deployment pipeline execution result.
+    /// </returns>
+    Task<DeploymentResult> RollbackAsync(string installPath, string targetVersion, IProgress<DeploymentProgress>? progress = null, CancellationToken cancellationToken = default);
 }

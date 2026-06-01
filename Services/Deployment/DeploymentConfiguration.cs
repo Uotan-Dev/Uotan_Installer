@@ -79,4 +79,22 @@ public sealed class DeploymentConfiguration
     /// Gets or initializes the release channel type; defaults to Release.
     /// </summary>
     public ReleaseChannel Channel { get; init; } = ReleaseChannel.Release;
+
+    /// <summary>
+    /// <para>获取或初始化用户选中的组件列表，默认为空列表。</para>
+    /// Gets or initializes the list of user-selected components; defaults to an empty list.
+    /// </summary>
+    public List<ComponentDefinition> SelectedComponents { get; init; } = [];
+
+    /// <summary>
+    /// <para>获取或初始化是否使用增量更新，默认为 false。</para>
+    /// Gets or initializes whether to use delta updates; defaults to false.
+    /// </summary>
+    public bool UseDeltaUpdate { get; init; }
+
+    /// <summary>
+    /// <para>获取或初始化当前版本号（用于增量更新），为 null 时表示首次安装。</para>
+    /// Gets or initializes the current version string (for delta updates); null for first installation.
+    /// </summary>
+    public string? CurrentVersion { get; init; }
 }

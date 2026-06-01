@@ -111,4 +111,90 @@ public interface IPlatformAdapter
     /// A task representing the asynchronous operation.
     /// </returns>
     Task OpenInFileExplorerAsync(string path);
+
+    /// <summary>
+    /// <para>异步注册 URL 协议处理器。</para>
+    /// Asynchronously registers a URL protocol handler.
+    /// </summary>
+    /// <param name="scheme">
+    /// <para>URL 协议方案（如 "uotan"）。</para>
+    /// The URL protocol scheme (e.g. "uotan").
+    /// </param>
+    /// <param name="exePath">
+    /// <para>处理协议请求的可执行文件路径。</para>
+    /// The executable file path that handles the protocol request.
+    /// </param>
+    /// <param name="ct">
+    /// <para>取消令牌。</para>
+    /// Cancellation token.
+    /// </param>
+    /// <returns>
+    /// <para>表示异步操作的 Task。</para>
+    /// A task representing the asynchronous operation.
+    /// </returns>
+    Task RegisterProtocolHandlerAsync(string scheme, string exePath, CancellationToken ct);
+
+    /// <summary>
+    /// <para>异步将指定目录添加到系统 PATH 环境变量。</para>
+    /// Asynchronously adds the specified directory to the system PATH environment variable.
+    /// </summary>
+    /// <param name="directory">
+    /// <para>要添加的目录路径。</para>
+    /// The directory path to add.
+    /// </param>
+    /// <param name="ct">
+    /// <para>取消令牌。</para>
+    /// Cancellation token.
+    /// </param>
+    /// <returns>
+    /// <para>表示异步操作的 Task。</para>
+    /// A task representing the asynchronous operation.
+    /// </returns>
+    Task AddToSystemPathAsync(string directory, CancellationToken ct);
+
+    /// <summary>
+    /// <para>异步从系统 PATH 环境变量中移除指定目录。</para>
+    /// Asynchronously removes the specified directory from the system PATH environment variable.
+    /// </summary>
+    /// <param name="directory">
+    /// <para>要移除的目录路径。</para>
+    /// The directory path to remove.
+    /// </param>
+    /// <param name="ct">
+    /// <para>取消令牌。</para>
+    /// Cancellation token.
+    /// </param>
+    /// <returns>
+    /// <para>表示异步操作的 Task。</para>
+    /// A task representing the asynchronous operation.
+    /// </returns>
+    Task RemoveFromSystemPathAsync(string directory, CancellationToken ct);
+
+    /// <summary>
+    /// <para>获取指定应用程序的数据目录路径。</para>
+    /// Gets the data directory path for the specified application.
+    /// </summary>
+    /// <param name="appName">
+    /// <para>应用程序名称。</para>
+    /// The application name.
+    /// </param>
+    /// <returns>
+    /// <para>应用数据目录的绝对路径。</para>
+    /// The absolute path of the application data directory.
+    /// </returns>
+    string GetAppDataDirectory(string appName);
+
+    /// <summary>
+    /// <para>异步获取指定安装路径中应用程序的已安装版本号。</para>
+    /// Asynchronously gets the installed version number of the application at the specified installation path.
+    /// </summary>
+    /// <param name="installPath">
+    /// <para>安装目录路径。</para>
+    /// The installation directory path.
+    /// </param>
+    /// <returns>
+    /// <para>表示异步操作的任务，结果为版本号字符串；若未安装则返回 null。</para>
+    /// A task representing the asynchronous operation, with the result being the version string; or null if not installed.
+    /// </returns>
+    Task<string?> GetInstalledVersionAsync(string installPath);
 }

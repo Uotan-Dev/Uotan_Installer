@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace UotanInstaller.App.Models;
 
@@ -80,6 +81,12 @@ public sealed class InstallerConfig
     /// Gets or sets the localized display name of the channel.
     /// </summary>
     public string ChannelDisplayName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// <para>获取或设置可用组件列表。</para>
+    /// Gets or sets the list of available components.
+    /// </summary>
+    public List<ComponentDefinition> AvailableComponents { get; set; } = [];
 }
 
 /// <summary>
@@ -310,3 +317,145 @@ public sealed class ReleaseChannelInfo
     /// </summary>
     public int StabilityLevel { get; set; } = 1;
 }
+
+/// <summary>
+/// <para>表示安装组件的定义信息。</para>
+/// Represents the definition information of an installation component.
+/// </summary>
+public sealed partial class ComponentDefinition : ObservableObject
+{
+    /// <summary>
+    /// <para>获取或设置组件的唯一标识符。</para>
+    /// Gets or sets the unique identifier of the component.
+    /// </summary>
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    /// <summary>
+    /// <para>获取或设置组件的本地化显示名称。</para>
+    /// Gets or sets the localized display name of the component.
+    /// </summary>
+    [JsonPropertyName("display_name")]
+    public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// <para>获取或设置组件的本地化描述。</para>
+    /// Gets or sets the localized description of the component.
+    /// </summary>
+    [JsonPropertyName("description")]
+    public string Description { get; set; } = string.Empty;
+
+    /// <summary>
+    /// <para>获取或设置组件的大小（字节）。</para>
+    /// Gets or sets the size of the component in bytes.
+    /// </summary>
+    [JsonPropertyName("size")]
+    public long Size { get; set; }
+
+    /// <summary>
+    /// <para>获取或设置组件是否为必选组件。</para>
+    /// Gets or sets whether the component is required.
+    /// </summary>
+    [JsonPropertyName("is_required")]
+    public bool IsRequired { get; set; }
+
+    /// <summary>
+    /// <para>获取或设置组件是否默认选中。</para>
+    /// Gets or sets whether the component is selected by default.
+    /// </summary>
+    [JsonPropertyName("is_selected_by_default")]
+    public bool IsSelectedByDefault { get; set; } = true;
+
+    /// <summary>
+    /// <para>获取或设置组件包含的文件模式列表。</para>
+    /// Gets or sets the list of file patterns included in the component.
+    /// </summary>
+    [JsonPropertyName("file_patterns")]
+    public List<string> FilePatterns { get; set; } = [];
+
+    /// <summary>
+    /// <para>获取或设置组件是否被用户选中。</para>
+    /// Gets or sets whether the component is selected by the user.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isSelected = true;
+}
+
+/// <summary>
+/// <para>表示版本安装记录。</para>
+/// Represents a version installation record.
+/// </summary>
+public sealed class VersionRecord
+{
+    /// <summary>
+    /// <para>获取或设置版本号。</para>
+    /// Gets or sets the version string.
+    /// </summary>
+    [JsonPropertyName("version")]
+    public string Version { get; set; } = string.Empty;
+
+    /// <summary>
+    /// <para>获取或设置安装时间（ISO 8601 格式）。</para>
+    /// Gets or sets the installation time in ISO 8601 format.
+    /// </summary>
+    [JsonPropertyName("install_time")]
+    public string InstallTime { get; set; } = string.Empty;
+
+    /// <summary>
+    /// <para>获取或设置安装渠道。</para>
+    /// Gets or sets the installation channel.
+    /// </summary>
+    [JsonPropertyName("channel")]
+    public ReleaseChannel Channel { get; set; }
+
+    /// <summary>
+    /// <para>获取或设置安装路径。</para>
+    /// Gets or sets the installation path.
+    /// </summary>
+    [JsonPropertyName("install_path")]
+    public string InstallPath { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// <para>表示增量更新包信息。</para>
+/// Represents delta update package information.
+/// </summary>
+public sealed class DeltaUpdateInfo
+{
+    /// <summary>
+    /// <para>获取或设置增量更新包的下载 URL。</para>
+    /// Gets or sets the download URL of the delta update package.
+    /// </summary>
+    [JsonPropertyName("download_url")]
+    public string DownloadUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// <para>获取或设置源版本号。</para>
+    /// Gets or sets the source version string.
+    /// </summary>
+    [JsonPropertyName("from_version")]
+    public string FromVersion { get; set; } = string.Empty;
+
+    /// <summary>
+    /// <para>获取或设置目标版本号。</para>
+    /// Gets or sets the target version string.
+    /// </summary>
+    [JsonPropertyName("to_version")]
+    public string ToVersion { get; set; } = string.Empty;
+
+    /// <summary>
+    /// <para>获取或设置增量更新包的大小（字节）。</para>
+    /// Gets or sets the size of the delta update package in bytes.
+    /// </summary>
+    [JsonPropertyName("size")]
+    public long Size { get; set; }
+
+    /// <summary>
+    /// <para>获取或设置增量更新包的校验值。</para>
+    /// Gets or sets the checksum of the delta update package.
+    /// </summary>
+    [JsonPropertyName("checksum")]
+    public string? Checksum { get; set; }
+}
+
+

@@ -256,6 +256,190 @@ public sealed class MacOSPlatformAdapter : IPlatformAdapter
         });
     }
 
+    /// <summary>
+    /// <para>异步注册 URL 协议处理器。</para>
+    /// Asynchronously registers a URL protocol handler.
+    /// </summary>
+    public Task RegisterProtocolHandlerAsync(string scheme, string exePath, CancellationToken ct)
+    {
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var plistPath = Path.Combine(exePath, "Contents", "Info.plist");
+            if (!File.Exists(plistPath))
+            {
+                Debug.WriteLine($"Info.plist not found at '{plistPath}'");
+                return;
+            }
+
+            try
+            {
+                RunPlistBuddy(plistPath, "Add :CFBundleURLTypes array");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"CFBundleURLTypes array may already exist: {ex.Message}");
+            }
+
+            try
+            {
+                var idx = GetPlistBuddyArrayLength(plistPath, ":CFBundleURLTypes");
+                RunPlistBuddy(plistPath, $"Add :CFBundleURLTypes:{idx} dict");
+                RunPlistBuddy(plistPath, $"Add :CFBundleURLTypes:{idx}:CFBundleURLSchemes array");
+                RunPlistBuddy(plistPath, $"Add :CFBundleURLTypes:{idx}:CFBundleURLSchemes:0 string {scheme}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to add URL scheme '{scheme}' to Info.plist: {ex.Message}");
+            }
+        }, ct);
+    }
+
+    /// <summary>
+    /// <para>执行 PlistBuddy 命令修改 plist 文件。</para>
+    /// Executes a PlistBuddy command to modify a plist file.
+    /// </summary>
+    private static void RunPlistBuddy(string plistPath, string command)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = "/usr/libexec/PlistBuddy",
+            Arguments = $"-c \"{command}\" \"{plistPath}\"",
+            UseShellExecute = false,
+        };
+        using var process = Process.Start(psi)
+            ?? throw new DeploymentException($"Failed to start PlistBuddy for command: {command}");
+        process.WaitForExit();
+        if (process.ExitCode != 0)
+        {
+            throw new DeploymentException($"PlistBuddy command failed: {command}, exit code: {process.ExitCode}");
+        }
+    }
+
+    /// <summary>
+    /// <para>获取 plist 数组的长度。</para>
+    /// Gets the length of a plist array.
+    /// </summary>
+    private static int GetPlistBuddyArrayLength(string plistPath, string arrayPath)
+    {
+        for (int i = 0; ; i++)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "/usr/libexec/PlistBuddy",
+                    Arguments = $"-c \"Print {arrayPath}:{i}\" \"{plistPath}\"",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                };
+                using var process = Process.Start(psi);
+                if (process is null || process.ExitCode != 0) return i;
+                process.WaitForExit();
+                if (process.ExitCode != 0) return i;
+            }
+            catch
+            {
+                return i;
+            }
+        }
+    }
+
+    /// <summary>
+    /// <para>异步将指定目录添加到系统 PATH 环境变量。</para>
+    /// Asynchronously adds the specified directory to the system PATH environment variable.
+    /// </summary>
+    public Task AddToSystemPathAsync(string directory, CancellationToken ct)
+    {
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var shellRc = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".zshrc");
+            var exportLine = $"export PATH=\"$PATH:{directory}\"";
+
+            if (!File.Exists(shellRc))
+            {
+                File.WriteAllText(shellRc, exportLine + "\n");
+                return;
+            }
+
+            var content = File.ReadAllText(shellRc);
+            if (content.Contains(directory)) return;
+
+            File.AppendAllText(shellRc, "\n" + exportLine + "\n");
+        }, ct);
+    }
+
+    /// <summary>
+    /// <para>异步从系统 PATH 环境变量中移除指定目录。</para>
+    /// Asynchronously removes the specified directory from the system PATH environment variable.
+    /// </summary>
+    public Task RemoveFromSystemPathAsync(string directory, CancellationToken ct)
+    {
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var shellRc = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".zshrc");
+            if (!File.Exists(shellRc)) return;
+
+            var lines = File.ReadAllLines(shellRc)
+                .Where(l => !l.Contains(directory))
+                .ToArray();
+            File.WriteAllLines(shellRc, lines);
+        }, ct);
+    }
+
+    /// <summary>
+    /// <para>获取指定应用程序的数据目录路径。</para>
+    /// Gets the data directory path for the specified application.
+    /// </summary>
+    public string GetAppDataDirectory(string appName)
+    {
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "Application Support", appName);
+    }
+
+    /// <summary>
+    /// <para>异步获取指定安装路径中应用程序的已安装版本号。</para>
+    /// Asynchronously gets the installed version number of the application at the specified installation path.
+    /// </summary>
+    public Task<string?> GetInstalledVersionAsync(string installPath)
+    {
+        return Task.Run(() =>
+        {
+            if (!Directory.Exists(installPath)) return null;
+
+            var plistPath = Path.Combine(installPath, "Contents", "Info.plist");
+            if (!File.Exists(plistPath)) return null;
+
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "/usr/libexec/PlistBuddy",
+                    Arguments = $"-c \"Print :CFBundleShortVersionString\" \"{plistPath}\"",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                };
+                using var process = Process.Start(psi);
+                if (process is null) return null;
+
+                process.WaitForExit();
+                if (process.ExitCode != 0) return null;
+
+                var output = process.StandardOutput.ReadLine();
+                return string.IsNullOrWhiteSpace(output) ? null : output.Trim();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to read CFBundleShortVersionString via PlistBuddy: {ex.Message}");
+                return null;
+            }
+        });
+    }
+
     private static string EscapeAppleScriptString(string value)
     {
         return value.Replace("\\", "\\\\").Replace("\"", "\\\"");

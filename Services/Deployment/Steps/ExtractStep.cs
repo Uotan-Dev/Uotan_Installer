@@ -13,23 +13,12 @@ public sealed class ExtractStep : IDeploymentStep
     private readonly string _targetDirectory;
     private readonly IReadOnlyList<FileDeploymentRule>? _fileRules;
     private readonly ILocalizationService _localizationService;
+    private readonly IReadOnlyList<string>? _includePatterns;
 
-    /// <summary>
-    /// <para>获取步骤名称。</para>
-    /// Gets the step name.
-    /// </summary>
     public string Name { get; }
 
-    /// <summary>
-    /// <para>获取步骤类型。</para>
-    /// Gets the step kind.
-    /// </summary>
     public DeploymentStepKind Kind { get; } = DeploymentStepKind.Extract;
 
-    /// <summary>
-    /// <para>获取或设置是否跳过此步骤。</para>
-    /// Gets or sets whether to skip this step.
-    /// </summary>
     public bool Skip { get; set; }
 
     /// <summary>
@@ -52,12 +41,17 @@ public sealed class ExtractStep : IDeploymentStep
     /// <para>文件部署规则列表，可为 null。匹配规则的文件将被解压到指定的子目录中。</para>
     /// The list of file deployment rules, or null. Files matching a rule will be extracted to the specified subdirectory.
     /// </param>
-    public ExtractStep(string archivePath, string targetDirectory, ILocalizationService localizationService, IReadOnlyList<FileDeploymentRule>? fileRules = null)
+    /// <param name="includePatterns">
+    /// <para>组件过滤的文件包含模式列表，可为 null。为 null 或空时表示全量安装。</para>
+    /// The list of file inclusion patterns for component filtering, or null. Null or empty means full installation.
+    /// </param>
+    public ExtractStep(string archivePath, string targetDirectory, ILocalizationService localizationService, IReadOnlyList<FileDeploymentRule>? fileRules = null, IReadOnlyList<string>? includePatterns = null)
     {
         _archivePath = archivePath;
         _targetDirectory = targetDirectory;
         _localizationService = localizationService;
         _fileRules = fileRules;
+        _includePatterns = includePatterns;
         Name = _localizationService["Step_Extract"];
     }
 
@@ -120,6 +114,11 @@ public sealed class ExtractStep : IDeploymentStep
 
                     var entryKey = entry.Key ?? string.Empty;
                     var fileName = Path.GetFileName(entryKey);
+
+                    if (_includePatterns is not null && _includePatterns.Count > 0 && !ShouldIncludeEntry(entryKey))
+                    {
+                        continue;
+                    }
 
                     var destinationDirectory = ResolveDestinationDirectory(normalizedTarget, entryKey, fileName);
                     var destinationPath = Path.GetFullPath(Path.Combine(destinationDirectory, fileName));
@@ -230,6 +229,31 @@ public sealed class ExtractStep : IDeploymentStep
         }
 
         return true;
+    }
+
+    private bool ShouldIncludeEntry(string entryKey)
+    {
+        var normalizedPath = entryKey.Replace('\\', '/');
+
+        foreach (var pattern in _includePatterns!)
+        {
+            if (WildcardMatch(normalizedPath, pattern.Replace('\\', '/')))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool WildcardMatch(string input, string pattern)
+    {
+        if (!pattern.Contains('*') && !pattern.Contains('?'))
+            return string.Equals(input, pattern, StringComparison.OrdinalIgnoreCase);
+
+        var regexPattern = "^" + System.Text.RegularExpressions.Regex.Escape(pattern)
+            .Replace("\\*", ".*")
+            .Replace("\\?", ".") + "$";
+
+        return System.Text.RegularExpressions.Regex.IsMatch(input, regexPattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
 
     private static bool MatchesPattern(string fileName, string pattern)
