@@ -31,8 +31,8 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
     }
 
     /// <summary>
-    /// <para>在 Windows 桌面创建应用程序快捷方式（.lnk 文件），使用 IWshRuntimeLibrary（Windows Script Host Object Model）COM 组件实现。</para>
-    /// Creates an application shortcut (.lnk file) on the Windows desktop using the IWshRuntimeLibrary (Windows Script Host Object Model) COM component.
+    /// <para>在 Windows 桌面创建应用程序快捷方式（.lnk 文件），按照 MS-SHLLINK 二进制格式规范直接写入，无需 COM 互操作，完全兼容 AOT 发布。</para>
+    /// Creates an application shortcut (.lnk file) on the Windows desktop by writing directly according to the MS-SHLLINK binary format specification, without COM interop, fully compatible with AOT publishing.
     /// </summary>
     /// <param name="appName">
     /// <para>应用程序名称，用作快捷方式文件名。</para>
@@ -62,15 +62,9 @@ public sealed class WindowsPlatformAdapter : IPlatformAdapter
 
             var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             var lnkPath = Path.Combine(desktopPath, $"{appName}.lnk");
+            var workingDir = Path.GetDirectoryName(targetPath) ?? string.Empty;
 
-            var shell = new IWshRuntimeLibrary.WshShell();
-            var shortcut = (IWshRuntimeLibrary.IWshShortcut)shell.CreateShortcut(lnkPath);
-            shortcut.TargetPath = targetPath;
-            shortcut.WorkingDirectory = Path.GetDirectoryName(targetPath) ?? string.Empty;
-            shortcut.WindowStyle = 1;
-            if (!string.IsNullOrEmpty(args))
-                shortcut.Arguments = args;
-            shortcut.Save();
+            ShellLinkWriter.CreateShortcut(lnkPath, targetPath, args, workingDir, showCommand: 1);
         }, ct);
     }
 
